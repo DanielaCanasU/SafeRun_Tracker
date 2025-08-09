@@ -43,14 +43,13 @@ void IRAM_ATTR handleButtonInterrupt() {
 }
 
 bool processButtonPattern(unsigned long currentTime) {
-    Serial.println(waitingForLongPress);
     if (waitingForLongPress) {
         if (digitalRead(BUTTON_PIN) == LOW) {
             if (pressStartTime == 0) {
                 pressStartTime = currentTime;
             } else if (currentTime - pressStartTime >= LONG_PRESS_TIME) {
                 debugPrint("Patrón completo detectado. Aceptando solicitud...");
-                onLinkRequestPatternComplete();
+                //onLinkRequestPatternComplete();
                 resetButtonState();
                 return true;
             }

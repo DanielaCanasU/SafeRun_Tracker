@@ -51,7 +51,7 @@ const uint8_t Optimisation = LDRO_AUTO;         //low data rate optimisation set
 //for SX1262, SX1268 power range is +22dBm to -9dBm
 //for SX1261, power range is +15dBm t0 -9dBm
 
-const int8_t TXpower = 2;                      //LoRa transmit power in dBm
+const int8_t TXpower = 22;                      //LoRa transmit power in dBm
 
 const uint16_t packet_delay = 1000;             //mS delay between packets
 // Heltec ESP32S3 LoRa (V3) SX1262 receiver 

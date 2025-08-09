@@ -32,8 +32,16 @@
 SensorData currentData;
 unsigned long lastPublishTime = 0;
 unsigned long lastCheck = 0;
+unsigned long lastLoraCheck = 0;
 static int lastState = 0;
 static String sessionId = "";
+
+
+static uint8_t RXBUFFER[RXBUFFER_SIZE];
+static uint8_t RXPacketL = 0;
+bool PUBLISH_FIREBASE = true;
+bool OPEN_TO_PAIR = false;
+bool WAITING_LORA = false;
 
 // =============================================================================
 // FUNCTION DECLARATIONS
@@ -78,6 +86,7 @@ void setup() {
     
     successPrint("All systems initialized successfully");
     debugPrint("Device ready for operation");
+    pinMode(4, INPUT);
 }
 
 /**
@@ -87,19 +96,71 @@ void loop() {
     unsigned long now = millis();
     static int lastSensor4 = 0;
     // Check for pending link requests periodically
-    if (now - lastCheck >= CHECK_INTERVAL) {
-        lastCheck = now;
-        if (checkForLinkRequest()) {
-            debugPrint("Link request found - waiting for button pattern");
+    if (OPEN_TO_PAIR) {
+        if (now - lastCheck >= CHECK_INTERVAL) {
+            lastCheck = now;
+            if (checkForLinkRequest()) {
+                debugPrint("Link request found - waiting for button pattern");
+                onLinkRequestPatternComplete();
+            }
         }
     }
-    // Process LoRa messages
-    if (processLoRaMessage(currentData)) {
-        debugPrint("Valid LoRa message received");
-        printSensorData(currentData);
+    uint8_t busy_timeout_cnt;
+    busy_timeout_cnt = 0;
+    /*
+    while (digitalRead(22))
+    {
+      delay(1);
+      busy_timeout_cnt++;
+  
+      if (busy_timeout_cnt > 10) //wait 10mS for busy to complete
+      {
+        busy_timeout_cnt = 0;
+        Serial.println(F("ERROR - Busy Timeout!"));
+        break;
+      }
     }
+      */
+    //RXPacketL = LT.receive(RXBUFFER, RXBUFFER_SIZE, LORA_TIMEOUT, NO_WAIT);
+    //LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);  //set for IRQ on RX done or timeout
+    /*//LENTOOOO
+    LT.setRx(LORA_TIMEOUT);
+    uint16_t IRQStatus;
+    IRQStatus = LT.readIrqStatus(); 
+    */
+   if(!WAITING_LORA) {
+        LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);  //set for IRQ on RX done or timeout
+        LT.setRx(LORA_TIMEOUT);
+        WAITING_LORA = true;
+   }
+    /*Serial.printf("IRQStatus: 0b");
+    for (int i = 15; i >= 0; i--) {
+        Serial.print((IRQStatus >> i) & 1);
+    }
+    Serial.println();
+    */
+    
+    //LT.printIrqStatus();
+    // Process LoRa messages
+    if (now - lastLoraCheck >= LORA_CHECK_INTERVAL) {
+        //if (IRQStatus & IRQ_RX_DONE) {
+        if(digitalRead(4)) {
+            //Serial.printf("SE ACTIVO");
+            processLoRaMessage(currentData);
+            debugPrint("Valid LoRa message received");
+            printSensorData(currentData);
+            WAITING_LORA = false;
+        }
+    }
+    
+   /* RAPIDOOOO
+    LT.setRx(LORA_TIMEOUT);
+    processLoRaMessage(currentData);
+    debugPrint("Valid LoRa message received");
+    printSensorData(currentData);
+    */
     // Publish data to Firebase periódicamente
-    if (isFirebaseReady() && (now - lastPublishTime >= PUBLISH_INTERVAL || lastPublishTime == 0)) {
+    if ((isFirebaseReady() && (now - lastPublishTime >= PUBLISH_INTERVAL || lastPublishTime == 0) && (PUBLISH_FIREBASE))) {
         if (publishSensorDataToFirebase(currentData)) {
             lastPublishTime = now;
             // Manejo de sesiones
@@ -128,7 +189,7 @@ void loop() {
         }
     }
     // Process button patterns and long press detection
-    processButtonPattern(now);
+    OPEN_TO_PAIR = processButtonPattern(now);
     // Small delay to prevent watchdog issues
     delay(10);
 }

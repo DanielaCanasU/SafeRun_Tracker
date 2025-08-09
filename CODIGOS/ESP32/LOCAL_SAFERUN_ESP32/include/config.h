@@ -10,7 +10,7 @@
 // =============================================================================
 #define RYLR_RX 16  // RX del ESP32 <- TX del RYLR998
 #define RYLR_TX 17  // TX del ESP32 -> RX del RYLR998
-#define BUTTON_PIN 12
+#define BUTTON_PIN 13
 
 // =============================================================================
 // WIFI CREDENTIALS
@@ -32,6 +32,7 @@ extern const char* USER_PASSWORD;
 // =============================================================================
 extern const unsigned long PUBLISH_INTERVAL;
 extern const unsigned long CHECK_INTERVAL;
+extern const unsigned long LORA_CHECK_INTERVAL;
 
 // =============================================================================
 // BUTTON CONFIGURATION

@@ -17,8 +17,9 @@ const char* USER_EMAIL = "justtoprivacy@gmail.com";
 const char* USER_PASSWORD = "28082002";
 
 // Timing configuration
-const unsigned long PUBLISH_INTERVAL = 10000;  // 25 seconds
+const unsigned long PUBLISH_INTERVAL = 20000;  // 25 seconds
 const unsigned long CHECK_INTERVAL = 10000;    // 10 seconds
+const unsigned long LORA_CHECK_INTERVAL = 100; // 1 second
 
 // Button configuration
 const unsigned long BUTTON_DEBOUNCE_TIME = 200;   // milliseconds
@@ -28,7 +29,7 @@ const unsigned long PATTERN_TIMEOUT = 8000;       // milliseconds
 const int REQUIRED_CLICKS = 3;                    // clicks for pattern
 
 // LoRa configuration
-const unsigned long LORA_TIMEOUT = 1000;  //  1 seconds
+const unsigned long LORA_TIMEOUT = 10000;  //  1 seconds
 
 // Time zone configuration
 const int TIMEZONE_OFFSET = -5;  // GMT-5 (Colombia)

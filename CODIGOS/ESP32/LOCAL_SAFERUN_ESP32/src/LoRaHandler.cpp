@@ -58,6 +58,9 @@ void configureSX1262() {
 }
 
 bool processLoRaMessage(SensorData &data) {
+
+    
+
     RXPacketL = LT.receive(RXBUFFER, RXBUFFER_SIZE, LORA_TIMEOUT, WAIT_RX);
     PacketRSSI = LT.readPacketRSSI();
     PacketSNR = LT.readPacketSNR();
