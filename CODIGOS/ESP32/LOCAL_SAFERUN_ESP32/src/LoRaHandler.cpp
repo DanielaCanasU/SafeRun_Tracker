@@ -2,6 +2,7 @@
 #include "config.h"
 #include "Utils.h"
 #include "SX1262_Settings.h"
+#include "base64.hpp"  // Asegúrate de tener esta librería instalada
 
 // =============================================================================
 // GLOBAL VARIABLES
@@ -18,6 +19,30 @@ static uint8_t RXPacketL = 0;
 static int8_t PacketRSSI = 0;
 static int8_t PacketSNR = 0;
 static String lastPacket = "";
+
+// Cifrar mensaje antes de enviar
+String cifrarValor(String texto) {
+    int len = texto.length();
+    u8 input[len + 1];
+    texto.getBytes(input, len + 1);
+
+    u8 output[2 * len]; // Base64 puede expandir el tamaño
+    encode_base64(input, len, output);
+
+    return String((char *)output);
+}
+
+// Descifrar mensaje al recibir
+String descifrarValor(String codificado) {
+    int len = codificado.length();
+    u8 input[len + 1];
+    codificado.getBytes(input, len + 1);
+
+    u8 output[len];  // El mensaje decodificado será más corto
+    int outputLength = decode_base64(input, len, output);
+
+    return String((char *)output);
+}
 
 // =============================================================================
 // LORA HANDLER IMPLEMENTATION
@@ -112,27 +137,31 @@ bool processLoRaMessage(SensorData &data) {
             packet += (char)RXBUFFER[i];
         }
         
+        // Descifra el mensaje recibido
+        String packetDescifrado = descifrarValor(packet);
+        
         // Parse the message and populate sensor data
-        parseLoRaMessage(packet, data);
+        parseLoRaMessage(packetDescifrado, data);
         
         // Set RSSI and SNR values
         data.rssi = PacketRSSI;
         data.snr = PacketSNR;
         
         // Update last packet string for web interface
-        lastPacket = String(millis() / 1000) + "s," + packet + "," + String(PacketRSSI) + "dBm," + String(PacketSNR) + "dB";
+        lastPacket = String(millis() / 1000) + "s," + packetDescifrado + "," + String(PacketRSSI) + "dBm," + String(PacketSNR) + "dB";
         
         return true;
     }
 }
 
 void sendLoRaCommand(String cmd) {
+    String cmd = cifrarValor(cmd); // Cifra el mensaje antes de enviarlo
     Serial.print("[CMD] > ");
     Serial.println(cmd);
-    
+
     Serial2.print(cmd + "\r\n");
     delay(300);
-    
+
     while (Serial2.available()) {
         String response = Serial2.readStringUntil('\n');
         Serial.print("[RESP] < ");
@@ -160,4 +189,4 @@ void printPacketStats() {
 
 String getLastPacketString() {
     return lastPacket;
-} 
+}
