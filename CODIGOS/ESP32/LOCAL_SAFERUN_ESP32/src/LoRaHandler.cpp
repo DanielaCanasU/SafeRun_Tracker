@@ -2,7 +2,7 @@
 #include "config.h"
 #include "Utils.h"
 #include "SX1262_Settings.h"
-#include "base64.hpp"  // Asegúrate de tener esta librería instalada
+#include <AESLib.h>  // Librería AES para cifrado
 
 // =============================================================================
 // GLOBAL VARIABLES
@@ -20,28 +20,35 @@ static int8_t PacketRSSI = 0;
 static int8_t PacketSNR = 0;
 static String lastPacket = "";
 
-// Cifrar mensaje antes de enviar
+// Clave y vector de inicialización para AES (16 bytes cada uno)
+static byte aes_key[] = { 'S', 'A', 'F', 'E', 'R', 'U', 'N', 'C', 'I', 'F', 'R', 'A', 'D', 'O', '1', '2' };
+static byte aes_iv[]  = { 'I', 'n', 'i', 'c', 'i', 'a', 'l', 'I', 'V', '1', '2', '3', '4', '5', '6', '7' };
+AESLib aesLib;
+
+// Cifrar mensaje antes de enviar usando AES
 String cifrarValor(String texto) {
     int len = texto.length();
-    u8 input[len + 1];
-    texto.getBytes(input, len + 1);
+    char input[len + 1];
+    texto.getBytes((unsigned char*)input, len + 1);
 
-    u8 output[2 * len]; // Base64 puede expandir el tamaño
-    encode_base64(input, len, output);
-
-    return String((char *)output);
+    // El tamaño cifrado puede ser mayor, reserva suficiente espacio
+    char encrypted[128];
+    int encryptedLen = aesLib.encrypt64(input, len, encrypted, aes_key, sizeof(aes_key), aes_iv, sizeof(aes_iv));
+    if (encryptedLen <= 0) return "";
+    return String(encrypted);
 }
 
-// Descifrar mensaje al recibir
+// Descifrar mensaje al recibir usando AES
 String descifrarValor(String codificado) {
     int len = codificado.length();
-    u8 input[len + 1];
-    codificado.getBytes(input, len + 1);
+    char input[len + 1];
+    codificado.getBytes((unsigned char*)input, len + 1);
 
-    u8 output[len];  // El mensaje decodificado será más corto
-    int outputLength = decode_base64(input, len, output);
-
-    return String((char *)output);
+    char decrypted[128];
+    int decryptedLen = aesLib.decrypt64(input, decrypted, aes_key, sizeof(aes_key), aes_iv, sizeof(aes_iv));
+    if (decryptedLen <= 0) return "";
+    decrypted[decryptedLen] = '\0';
+    return String(decrypted);
 }
 
 // =============================================================================
