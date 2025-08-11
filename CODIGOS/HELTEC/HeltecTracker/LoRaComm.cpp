@@ -1,6 +1,39 @@
 #include "LoRaComm.h"
 #include <SPI.h>
 #include "SX1262_Settings.h"
+#include <AESLib.h> 
+
+// Clave y vector de inicialización para AES (16 bytes cada uno)
+static byte aes_key[] = { 'S', 'A', 'F', 'E', 'R', 'U', 'N', 'C', 'I', 'F', 'R', 'A', 'D', 'O', '1', '2' };
+static byte aes_iv[]  = { 'I', 'n', 'i', 'c', 'i', 'a', 'l', 'I', 'V', '1', '2', '3', '4', '5', '6', '7' };
+AESLib aesLib;
+
+// Cifrar mensaje antes de enviar usando AES
+String cifrarValor(String texto) {
+    int len = texto.length();
+    char input[len + 1];
+    texto.getBytes((unsigned char*)input, len + 1);
+
+    // El tamaño cifrado puede ser mayor, reserva suficiente espacio
+    char encrypted[128];
+    int encryptedLen = aesLib.encrypt64(input, len, encrypted, aes_key, sizeof(aes_key), aes_iv, sizeof(aes_iv));
+    if (encryptedLen <= 0) return "";
+    return String(encrypted);
+}
+
+// Descifrar mensaje al recibir usando AES
+String descifrarValor(String codificado) {
+    int len = codificado.length();
+    char input[len + 1];
+    codificado.getBytes((unsigned char*)input, len + 1);
+
+    char decrypted[128];
+    int decryptedLen = aesLib.decrypt64(input, decrypted, aes_key, sizeof(aes_key), aes_iv, sizeof(aes_iv));
+    if (decryptedLen <= 0) return "";
+    decrypted[decryptedLen] = '\0';
+    return String(decrypted);
+}
+
 
 bool sendCommand(String command, unsigned long timeout, bool waitForOK) {
   Serial.print("Enviando Comando: ");
@@ -34,19 +67,21 @@ void configureSX1262() {
 }
 
 void sendMessage(const char* message, bool verbose) {
-  int TXPacketL = strlen(message);
+  // Cifrar el mensaje antes de enviarlo
+  String cifrado = cifrarValor(String(message));
+  int TXPacketL = cifrado.length();
   if (verbose) {
-    Serial.print("Contenido de message: "); Serial.println(message);
+    Serial.print("Contenido cifrado: "); Serial.println(cifrado);
     Serial.print("Bytes como int: ");
-    for (int i = 0; i < TXPacketL; i++) { Serial.print((int)message[i]); Serial.print(" "); }
+    for (int i = 0; i < TXPacketL; i++) { Serial.print((int)cifrado[i]); Serial.print(" "); }
     Serial.println();
-    Serial.print("Longitud real del mensaje: "); Serial.println(TXPacketL);
+    Serial.print("Longitud real del mensaje cifrado: "); Serial.println(TXPacketL);
     Serial.print(TXpower); Serial.print(F("dBm ")); Serial.print(F("Packet> ")); Serial.flush();
   }
   unsigned long startmS = millis();
   delay(10);
   if (TRANSMISION_COMPLETADA || TRANSMISION_FALLIDA) {
-    LT.transmitDaniela((uint8_t*)message, TXPacketL, 10000, TXpower, WAIT_TX);
+    LT.transmitDaniela((uint8_t*)cifrado.c_str(), TXPacketL, 10000, TXpower, WAIT_TX);
     TRANSMISION_COMPLETADA = false; TRANSMISION_FALLIDA = false;
   } else if (digitalRead(14)) {
     if (LT.readIrqStatus() & IRQ_RX_TX_TIMEOUT) TRANSMISION_FALLIDA = true; else TRANSMISION_COMPLETADA = true;
@@ -54,7 +89,7 @@ void sendMessage(const char* message, bool verbose) {
   if (TRANSMISION_COMPLETADA) {
     unsigned long endmS = millis();
     if (verbose) {
-      uint16_t localCRC = LT.CRCCCITT((uint8_t*)message, TXPacketL, 0xFFFF);
+      uint16_t localCRC = LT.CRCCCITT((uint8_t*)cifrado.c_str(), TXPacketL, 0xFFFF);
       Serial.print(F("  BytesSent,")); Serial.print(TXPacketL);
       Serial.print(F("  CRC,")); Serial.print(localCRC, HEX);
       Serial.print(F("  TransmitTime,")); Serial.print(endmS - startmS); Serial.print(F("mS"));
@@ -72,7 +107,6 @@ void sendMessage(const char* message, bool verbose) {
 }
 
 void checkForIncomingMessage() {
-  // Si se usa RYLR998, implementar aquí la lectura de +RCV
 }
 
 
