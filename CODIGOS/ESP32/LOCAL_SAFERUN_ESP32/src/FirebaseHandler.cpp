@@ -20,25 +20,26 @@ FirebaseConfig config;
 // =============================================================================
 
 bool initFirebaseHandler() {
-    if (!setupWiFi()) {
-        errorPrint("Failed to setup WiFi");
+    // Deprecated behavior: do not auto-connect WiFi here anymore.
+    // Keep only object setup; actual Firebase begin will be in startFirebase()
+    fbdo.setBSSLBufferSize(4096, 1024);
+    fbdo.setResponseSize(2048);
+    return true;
+}
+
+bool startFirebase() {
+    if (WiFi.status() != WL_CONNECTED) {
+        errorPrint("WiFi not connected. Cannot start Firebase.");
         return false;
     }
-    
     debugPrint("Configurando Firebase...");
     config.api_key = FIREBASE_API_KEY;
     auth.user.email = USER_EMAIL;
     auth.user.password = USER_PASSWORD;
-    
     config.token_status_callback = tokenStatusCallback;
     Firebase.reconnectNetwork(true);
-    
-    fbdo.setBSSLBufferSize(4096, 1024);
-    fbdo.setResponseSize(2048);
-    
     Firebase.begin(&config, &auth);
-    
-    debugPrint("Firebase handler initialized");
+    debugPrint("Firebase started");
     return true;
 }
 

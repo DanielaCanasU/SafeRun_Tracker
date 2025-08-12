@@ -15,6 +15,9 @@
  */
 bool initFirebaseHandler();
 
+// Initialize Firebase objects after WiFi is connected
+bool startFirebase();
+
 /**
  * @brief Setup WiFi connection
  * @return true if connection successful, false otherwise

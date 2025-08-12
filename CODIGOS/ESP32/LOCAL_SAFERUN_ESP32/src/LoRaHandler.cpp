@@ -2,7 +2,7 @@
 #include "config.h"
 #include "Utils.h"
 #include "SX1262_Settings.h"
-#include <AESLib.h>  // Librería AES para cifrado
+#include "AES.h"  // Librería AES de Matej Sychra
 
 // =============================================================================
 // GLOBAL VARIABLES
@@ -21,34 +21,88 @@ static int8_t PacketSNR = 0;
 static String lastPacket = "";
 
 // Clave y vector de inicialización para AES (16 bytes cada uno)
-static byte aes_key[] = { 'S', 'A', 'F', 'E', 'R', 'U', 'N', 'C', 'I', 'F', 'R', 'A', 'D', 'O', '1', '2' };
-static byte aes_iv[]  = { 'I', 'n', 'i', 'c', 'i', 'a', 'l', 'I', 'V', '1', '2', '3', '4', '5', '6', '7' };
-AESLib aesLib;
+static uint8_t aes_key[16] = { 'S', 'A', 'F', 'E', 'R', 'U', 'N', 'C', 'I', 'F', 'R', 'A', 'D', 'O', '1', '2' };
+static uint8_t aes_iv[16]  = { 'I', 'n', 'i', 'c', 'i', 'a', 'l', 'I', 'V', '1', '2', '3', '4', '5', '6', '7'};
+AES aes;
 
-// Cifrar mensaje antes de enviar usando AES
+// Cifrar mensaje antes de enviar usando AES (Matej Sychra) - soporta longitud variable (múltiplos de 16)
 String cifrarValor(String texto) {
-    int len = texto.length();
-    char input[len + 1];
-    texto.getBytes((unsigned char*)input, len + 1);
+    const int plainLength = texto.length();
+    if (plainLength <= 0) {
+        return "";
+    }
 
-    // El tamaño cifrado puede ser mayor, reserva suficiente espacio
-    char encrypted[128];
-    int encryptedLen = aesLib.encrypt64(input, len, encrypted, aes_key, sizeof(aes_key), aes_iv, sizeof(aes_iv));
-    if (encryptedLen <= 0) return "";
-    return String(encrypted);
+    const int paddedLength = ((plainLength + 15) / 16) * 16; // múltiplo de 16
+
+    uint8_t *plainBuffer = (uint8_t *)malloc(paddedLength);
+    if (!plainBuffer) {
+        return "";
+    }
+    memset(plainBuffer, 0, paddedLength);
+    texto.getBytes(plainBuffer, paddedLength);
+
+    uint8_t *cipherBuffer = (uint8_t *)malloc(paddedLength);
+    if (!cipherBuffer) {
+        free(plainBuffer);
+        return "";
+    }
+
+    uint8_t ivLocal[16];
+    memcpy(ivLocal, aes_iv, 16);
+
+    aes.do_aes_encrypt(plainBuffer, paddedLength, cipherBuffer, aes_key, 128, ivLocal);
+
+    String resultado;
+    resultado.reserve(paddedLength * 2);
+    for (int i = 0; i < paddedLength; i++) {
+        if (cipherBuffer[i] < 16) resultado += "0";
+        resultado += String(cipherBuffer[i], HEX);
+    }
+
+    free(plainBuffer);
+    free(cipherBuffer);
+    return resultado;
 }
 
-// Descifrar mensaje al recibir usando AES
+// Descifrar mensaje al recibir usando AES (Matej Sychra) - soporta longitud variable
 String descifrarValor(String codificado) {
-    int len = codificado.length();
-    char input[len + 1];
-    codificado.getBytes((unsigned char*)input, len + 1);
+    const int encodedLength = codificado.length();
+    if (encodedLength <= 0 || (encodedLength % 2) != 0) {
+        return "";
+    }
 
-    char decrypted[128];
-    int decryptedLen = aesLib.decrypt64(input, decrypted, aes_key, sizeof(aes_key), aes_iv, sizeof(aes_iv));
-    if (decryptedLen <= 0) return "";
-    decrypted[decryptedLen] = '\0';
-    return String(decrypted);
+    const int cipherLength = encodedLength / 2;
+    uint8_t *cipherBuffer = (uint8_t *)malloc(cipherLength);
+    if (!cipherBuffer) {
+        return "";
+    }
+
+    for (int i = 0; i < cipherLength; i++) {
+        String byteStr = codificado.substring(i * 2, i * 2 + 2);
+        cipherBuffer[i] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
+    }
+
+    uint8_t *plainBuffer = (uint8_t *)malloc(cipherLength);
+    if (!plainBuffer) {
+        free(cipherBuffer);
+        return "";
+    }
+
+    uint8_t ivLocal[16];
+    memcpy(ivLocal, aes_iv, 16);
+
+    aes.do_aes_decrypt(cipherBuffer, cipherLength, plainBuffer, aes_key, 128, ivLocal);
+
+    String resultado;
+    resultado.reserve(cipherLength);
+    for (int i = 0; i < cipherLength; i++) {
+        if (plainBuffer[i] == 0) break; // quitar padding cero
+        resultado += (char)plainBuffer[i];
+    }
+
+    free(cipherBuffer);
+    free(plainBuffer);
+    return resultado;
 }
 
 // =============================================================================
@@ -143,10 +197,10 @@ bool processLoRaMessage(SensorData &data) {
         for (int i = 0; i < RXPacketL; i++) {
             packet += (char)RXBUFFER[i];
         }
-        
+        Serial.println(packet);
         // Descifra el mensaje recibido
         String packetDescifrado = descifrarValor(packet);
-        
+        Serial.println(packetDescifrado);
         // Parse the message and populate sensor data
         parseLoRaMessage(packetDescifrado, data);
         
@@ -161,12 +215,12 @@ bool processLoRaMessage(SensorData &data) {
     }
 }
 
-void sendLoRaCommand(String cmd) {
-    String cmd = cifrarValor(cmd); // Cifra el mensaje antes de enviarlo
+void sendLoRaCommand(String messagesc) {
+    String message = cifrarValor(messagesc); // Cifra el mensaje antes de enviarlo
     Serial.print("[CMD] > ");
-    Serial.println(cmd);
+    Serial.println(message);
 
-    Serial2.print(cmd + "\r\n");
+    Serial2.print(message + "\r\n");
     delay(300);
 
     while (Serial2.available()) {

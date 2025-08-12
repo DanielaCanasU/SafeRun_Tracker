@@ -25,6 +25,7 @@
 #include "ButtonHandler.h"
 #include "LoRaHandler.h"
 #include "FirebaseHandler.h"
+#include "OLEDMenu.h"
 
 // =============================================================================
 // GLOBAL VARIABLES
@@ -73,7 +74,7 @@ void setup() {
         while (1) delay(1000);
     }
     
-    // Initialize Firebase handler (includes WiFi setup)
+    // Initialize Firebase handler (objects only; do not connect yet)
     if (!initFirebaseHandler()) {
         errorPrint("Failed to initialize Firebase handler");
         while (1) delay(1000);
@@ -81,8 +82,9 @@ void setup() {
     
     // Initialize button handler
     initButtonHandler();
-    // Initialize time synchronization
-    setupTime();
+    // Initialize OLED menu (WiFi/time will be handled after user connects)
+    initOLEDMenu();
+    // Do not call setupTime() here to avoid blocking before WiFi is connected
     
     successPrint("All systems initialized successfully");
     debugPrint("Device ready for operation");
@@ -159,8 +161,23 @@ void loop() {
     debugPrint("Valid LoRa message received");
     printSensorData(currentData);
     */
-    // Publish data to Firebase periódicamente
-    if ((isFirebaseReady() && (now - lastPublishTime >= PUBLISH_INTERVAL || lastPublishTime == 0) && (PUBLISH_FIREBASE))) {
+    // UI update first
+    updateOLEDMenu(now);
+
+    // Start Firebase only when in remote mode and WiFi is connected via menu
+    static bool firebaseStarted = false;
+    static bool timeSynced = false;
+    if (!firebaseStarted && isRemoteModeSelected() && isWiFiConnectedViaMenu()) {
+        firebaseStarted = startFirebase();
+    }
+    // Sync time once WiFi is available (remote or local) and not yet synced
+    if (!timeSynced && isWiFiConnectedViaMenu()) {
+        setupTime();
+        timeSynced = true;
+    }
+
+    // Publish data to Firebase periódicamente only if remote mode
+    if (isRemoteModeSelected() && (isFirebaseReady() && (now - lastPublishTime >= PUBLISH_INTERVAL || lastPublishTime == 0) && (PUBLISH_FIREBASE))) {
         if (publishSensorDataToFirebase(currentData)) {
             lastPublishTime = now;
             // Manejo de sesiones
@@ -190,6 +207,11 @@ void loop() {
     }
     // Process button patterns and long press detection
     OPEN_TO_PAIR = processButtonPattern(now);
+
+    // In local mode, optionally draw quick status onto OLED
+    if (!isRemoteModeSelected()) {
+        renderLocalLoRaOnOLED(currentData);
+    }
     // Small delay to prevent watchdog issues
     delay(10);
 }

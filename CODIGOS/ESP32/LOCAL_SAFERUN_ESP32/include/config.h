@@ -12,6 +12,16 @@
 #define RYLR_TX 17  // TX del ESP32 -> RX del RYLR998
 #define BUTTON_PIN 13
 
+// OLED I2C pins (default ESP32 I2C pins)
+#define OLED_SDA 21
+#define OLED_SCL 22
+
+// UI buttons (active LOW). Choose pins that do not conflict with LoRa or SPI
+#define BTN_UP_PIN    13
+#define BTN_DOWN_PIN  12
+#define BTN_OK_PIN    14
+#define BTN_BACK_PIN  27
+
 // =============================================================================
 // WIFI CREDENTIALS
 // =============================================================================
