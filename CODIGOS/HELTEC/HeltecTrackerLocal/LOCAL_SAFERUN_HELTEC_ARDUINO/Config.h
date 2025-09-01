@@ -32,6 +32,15 @@ extern const int TIMEZONE_OFFSET;
 extern const char* NTP_SERVER_1;
 extern const char* NTP_SERVER_2;
 
+// WiFi stability configuration
+extern const int WIFI_CONNECT_TIMEOUT;
+extern const int WIFI_RETRY_DELAY;
+extern const int WIFI_MAX_RETRIES;
+
+// Memory management configuration
+extern const size_t MIN_FREE_HEAP;
+extern const size_t CRITICAL_HEAP;
+
 // Button pins for Heltec Wireless Tracker v1.2
 #define BTN_UP_PIN 4
 #define BTN_DOWN_PIN 5

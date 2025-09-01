@@ -36,4 +36,9 @@ const uint16_t packet_delay = 1000;
 // Buffer size
 const uint16_t RXBUFFER_SIZE = 200;
 
+// IRQ definitions (from SX126XLT library)
+#define IRQ_RADIO_ALL 0x0000
+#define IRQ_RX_DONE 0x0002
+#define IRQ_RX_TX_TIMEOUT 0x0001
+
 

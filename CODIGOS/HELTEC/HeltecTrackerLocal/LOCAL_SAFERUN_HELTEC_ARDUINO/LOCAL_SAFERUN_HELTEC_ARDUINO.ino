@@ -2,7 +2,8 @@
 #include <WiFi.h>
 #include <Wire.h>
 #include <Preferences.h>
-//hOLA
+//hOL
+
 
 #include "Config.h"
 #include "SX1262_Settings.h"
@@ -43,26 +44,37 @@ void setup() {
     
     Serial.println("=== Heltec SafeRun Device Starting ===");
     
+    // Verificar memoria inicial
+    Serial.printf("Memoria libre al inicio: %d bytes\n", ESP.getFreeHeap());
+    
+    // Alimentar el watchdog durante la inicialización
+    yield();
+    
     // Initialize sensor data structure
     initSensorData(currentData);
+    yield();
     
     // Initialize LoRa handler
     if (!initLoRaHandler()) {
         Serial.println("Failed to initialize LoRa handler");
-        while (1) delay(1000);
+        while (1) { delay(1000); yield(); }
     }
+    yield();
     
     // Initialize Firebase handler (objects only; do not connect yet)
     if (!initFirebaseHandler()) {
         Serial.println("Failed to initialize Firebase handler");
-        while (1) delay(1000);
+        while (1) { delay(1000); yield(); }
     }
+    yield();
     
     // Initialize UI
     initUI();
+    yield();
     
     // Initialize GPS
     configureGPS();
+    yield();
     
     Serial.println("All systems initialized successfully");
     Serial.println("Device ready for operation");
@@ -71,6 +83,9 @@ void setup() {
 void loop() {
     unsigned long now = millis();
     static int lastSensor4 = 0;
+    
+    // Monitoreo de estabilidad del sistema
+    checkSystemStability();
     
     // Check for pending link requests periodically
     if (OPEN_TO_PAIR) {
@@ -119,13 +134,28 @@ void loop() {
     static bool firebaseStarted = false;
     static bool timeSynced = false;
     if (!firebaseStarted && isRemoteModeSelected() && WiFi.status() == WL_CONNECTED) {
-        firebaseStarted = startFirebase();
+        // Verificar memoria antes de iniciar Firebase
+        if (!isMemoryLow()) {
+            firebaseStarted = startFirebase();
+        } else {
+            Serial.println("Memoria baja - posponiendo inicio de Firebase");
+            forceGarbageCollection();
+        }
     }
     
     // Sync time once WiFi is available and not yet synced
     if (!timeSynced && WiFi.status() == WL_CONNECTED) {
-        setupTime();
-        timeSynced = true;
+        // Verificar memoria antes de sincronizar tiempo
+        if (!isMemoryLow()) {
+            setupTime();
+            timeSynced = true;
+            
+            // Verificar memoria después de sincronizar
+            checkMemoryStatus();
+        } else {
+            Serial.println("Memoria baja - posponiendo sincronización de tiempo");
+            forceGarbageCollection();
+        }
     }
 
     // Publish data to Firebase periodically only if remote mode

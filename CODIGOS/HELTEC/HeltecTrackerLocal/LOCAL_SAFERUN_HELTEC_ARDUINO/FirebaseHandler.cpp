@@ -32,13 +32,30 @@ bool startFirebase() {
         errorPrint("WiFi not connected. Cannot start Firebase.");
         return false;
     }
+    
+    // Verificar memoria antes de iniciar Firebase
+    if (ESP.getFreeHeap() < 20000) {
+        errorPrint("Memoria insuficiente para iniciar Firebase");
+        return false;
+    }
+    
     debugPrint("Configurando Firebase...");
+    
+    // Configurar Firebase con delays para evitar problemas
     config.api_key = FIREBASE_API_KEY;
     auth.user.email = USER_EMAIL;
     auth.user.password = USER_PASSWORD;
     config.token_status_callback = tokenStatusCallback;
+    
+    // Pequeño delay antes de iniciar
+    delay(100);
+    
     Firebase.reconnectNetwork(true);
     Firebase.begin(&config, &auth);
+    
+    // Pequeño delay después de iniciar
+    delay(100);
+    
     debugPrint("Firebase started");
     return true;
 }
@@ -47,23 +64,40 @@ bool setupWiFi() {
     Serial.print("\nConectando a WiFi: ");
     Serial.println(WIFI_SSID);
     
+    // Limpiar cualquier conexión previa
+    WiFi.disconnect(true);
+    delay(1000);
+    
+    // Configurar modo WiFi
     WiFi.mode(WIFI_STA);
+    
+    // Intentar conexión
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     
     int attempts = 0;
-    const int maxAttempts = 20; // 10 seconds
+    const int maxAttempts = 60; // 30 seconds (500ms * 60)
     
+    Serial.println("Esperando conexión WiFi...");
     while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
         delay(500);
         Serial.print(".");
         attempts++;
+        
+        // Verificar si hay problemas de memoria
+        if (ESP.getFreeHeap() < 10000) { // Menos de 10KB libres
+            Serial.println("\nAdvertencia: Memoria baja durante conexión WiFi");
+            delay(1000);
+        }
     }
     
     if (WiFi.status() == WL_CONNECTED) {
         successPrint("WiFi conectado. Dirección IP: " + WiFi.localIP().toString());
+        Serial.printf("Memoria libre después de conexión: %d bytes\n", ESP.getFreeHeap());
         return true;
     } else {
-        errorPrint("WiFi connection failed");
+        errorPrint("WiFi connection failed after " + String(attempts) + " attempts");
+        Serial.printf("Estado WiFi: %d\n", WiFi.status());
+        Serial.printf("Memoria libre: %d bytes\n", ESP.getFreeHeap());
         return false;
     }
 }

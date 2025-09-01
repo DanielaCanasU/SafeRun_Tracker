@@ -35,6 +35,15 @@ const int TIMEZONE_OFFSET = -5;  // GMT-5 (Colombia)
 const char* NTP_SERVER_1 = "pool.ntp.org";
 const char* NTP_SERVER_2 = "time.nist.gov";
 
+// WiFi stability configuration
+const int WIFI_CONNECT_TIMEOUT = 30000;  // 30 segundos timeout para conexión WiFi
+const int WIFI_RETRY_DELAY = 1000;       // 1 segundo entre reintentos
+const int WIFI_MAX_RETRIES = 3;          // Máximo 3 reintentos de conexión
+
+// Memory management configuration
+const size_t MIN_FREE_HEAP = 15000;      // Mínimo 15KB de memoria libre
+const size_t CRITICAL_HEAP = 8000;       // 8KB crítico - posible reinicio
+
 // default remote mode is true (Firebase)
 static bool remoteMode = true;
 
