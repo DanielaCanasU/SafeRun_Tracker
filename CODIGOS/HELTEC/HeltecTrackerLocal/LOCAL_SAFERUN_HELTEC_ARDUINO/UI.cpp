@@ -10,6 +10,7 @@
 static SensorData lastLoRaData = {};
 static unsigned long lastLoRaReceived = 0;
 
+
 static void renderInfoScreen();
 
 // Color definitions for improved UI
@@ -32,6 +33,7 @@ static bool readBtnBack() { return digitalRead(BTN_BACK_PIN) == LOW; }
 // Debounce
 static unsigned long lastBtnMs = 0;
 static const unsigned long btnDebounceMs = 180;
+
 static bool canReadButtons(unsigned long now) {
   if (now - lastBtnMs >= btnDebounceMs) { lastBtnMs = now; return true; }
   return false;
@@ -88,8 +90,10 @@ static bool hasTargetData = false;
 static unsigned long lastTargetUpdate = 0;
 static const unsigned long TARGET_TIMEOUT = 30000; // 30 segundos timeout
 
-// Local GPS position from Heltec device
-static float localLatitude = 0.0f;
+// Emparejamiento
+extern const char* userCorreoSolicitante; // Declaración para acceder a la variable de FirebaseHandler
+bool lastPantallaEmparejamiento = false; //0 = No hay solicitudes, 1 = Solicitud pendiente
+static float localLatitude = 0.0f; // Local GPS position from Heltec device
 static float localLongitude = 0.0f;
 static bool localPositionSet = false;
 static unsigned long lastLocalGPSUpdate = 0;
@@ -786,9 +790,9 @@ static void renderPairing() {
   }
   
   // Verificar si hay solicitudes de emparejamiento pendientes
-  if (pairingRequestPending) {
+  if (pairingRequestPending && !lastPantallaEmparejamiento) {
     // Mostrar solicitud pendiente
-    st7735.st7735_write_str(0, 20, "Solicitud de emparejamiento", Font_7x10, NARANJA);
+    st7735.st7735_write_str(0, 20, "Solicitud", Font_7x10, NARANJA);
     st7735.st7735_write_str(0, 32, "Dispositivo:", Font_7x10, ST7735_WHITE);
     
     // Mostrar ID del dispositivo (truncado si es muy largo)
@@ -801,9 +805,11 @@ static void renderPairing() {
     // Botón de aceptar
     fillRectPixels(20, 60, 120, 20, MORADO);
     st7735.st7735_write_str(45, 65, "ACEPTAR", Font_7x10, ST7735_WHITE, MORADO);
+    lastPantallaEmparejamiento = true;
+
     
-    drawFooter("OK: Aceptar | BACK: Rechazar");
-  } else {
+    //drawFooter("OK: Aceptar | BACK: Rechazar");
+  } else if(!pairingRequestPending && lastPantallaEmparejamiento) {
     // Sin solicitudes pendientes
     st7735.st7735_write_str(0, 20, "No hay solicitudes", Font_7x10, ST7735_GRAY);
     st7735.st7735_write_str(0, 32, "de emparejamiento", Font_7x10, ST7735_GRAY);
@@ -811,8 +817,8 @@ static void renderPairing() {
     
     // Indicador de estado
     st7735.st7735_write_str(0, 60, "Estado: Esperando...", Font_7x10, ST7735_WHITE);
-    
-    drawFooter("BACK: Volver al menu");
+    lastPantallaEmparejamiento = true;
+    //drawFooter("BACK: Volver al menu");
   }
 }
 
@@ -1946,7 +1952,7 @@ void checkPairingRequests() {
     // Si hay una solicitud pendiente, obtener el ID del dispositivo
     // Por ahora usamos un ID genérico, pero se puede mejorar para obtener el real
     pairingRequestPending = true;
-    pairingDeviceId = "Dispositivo solicitante"; // TODO: Obtener ID real desde Firebase
+    pairingDeviceId = userCorreoSolicitante; // TODO: Obtener ID real desde Firebase
   } else {
     pairingRequestPending = false;
     pairingDeviceId = "";

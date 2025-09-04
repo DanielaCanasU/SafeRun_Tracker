@@ -14,7 +14,7 @@
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
-
+const char* userCorreoSolicitante;
 // =============================================================================
 // FIREBASE HANDLER IMPLEMENTATION
 // =============================================================================
@@ -61,7 +61,7 @@ bool startFirebase() {
     config.token_status_callback = tokenStatusCallback;
     
     // Pequeño delay antes de iniciar
-    delay(10000);
+    delay(1000);
     Serial.println("hola");
 
     Firebase.reconnectNetwork(true);
@@ -199,6 +199,10 @@ bool checkForLinkRequest() {
     if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str())) {
         if (fbdo.httpCode() == FIREBASE_ERROR_HTTP_CODE_OK) {
             debugPrint("Solicitud encontrada: " + fbdo.payload());
+            DynamicJsonDocument doc(2048); // Aumentado para evitar desbordamiento
+            DeserializationError error = deserializeJson(doc, fbdo.payload());
+            userCorreoSolicitante = doc["fields"]["requestedByEmail"]["stringValue"];
+
             return true;
         } else if (fbdo.httpCode() == FIREBASE_ERROR_HTTP_CODE_NOT_FOUND) {
             debugPrint("No hay solicitud pendiente.");
@@ -229,7 +233,7 @@ bool asociarLinkRequest() {
     }
     
    
-    DynamicJsonDocument doc(4096); // Aumentado para evitar desbordamiento
+    DynamicJsonDocument doc(2048); // Aumentado para evitar desbordamiento
     DeserializationError error = deserializeJson(doc, fbdo.payload());
     
     if (error) {
@@ -273,20 +277,29 @@ bool asociarLinkRequest() {
                     // Aunque ya exista, procedemos a aceptar y borrar la solicitud.
                 } else {
                     // Construir array con dispositivos existentes + nuevo
-                    FirebaseJsonArray newDevices;
-                    newDevices.add(DEVICE_ID);
+                    FirebaseJson payload;
+                    int index = 0;
+                    
+                    // Agregar dispositivos existentes
                     for (JsonObject device : devices) {
-                        newDevices.add(device["stringValue"].as<const char*>());
+                        const char* existingDeviceId = device["stringValue"];
+                        payload.set("fields/devices/arrayValue/values/[" + String(index) + "]/stringValue", String(existingDeviceId));
+                        index++;
                     }
                     
-                    FirebaseJson updateContent;
-                    updateContent.set("fields/devices", newDevices);
+                    // Agregar el nuevo dispositivo
+                    payload.set("fields/devices/arrayValue/values/[" + String(index) + "]/stringValue", DEVICE_ID);
                     
-                    if (!Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), updateContent.raw(), "devices")) {
-                         errorPrint("Error al actualizar array de dispositivos: " + fbdo.errorReason());
-                         return false;
+                    debugPrint("Updating user document with existing devices + new device");
+                    debugPrint("Payload JSON: " + String(payload.raw()));
+                    
+                    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), payload.raw(), "devices")) {
+                        successPrint("Dispositivo vinculado al usuario (array actualizado).");
+                        return true;
+                    } else {
+                        errorPrint("Error al actualizar array: " + fbdo.errorReason());
+                        return false;
                     }
-                    successPrint("Dispositivo añadido a la lista del usuario.");
                 }
             } 
         }
@@ -299,7 +312,7 @@ bool asociarLinkRequest() {
     debugPrint("Creating new user document with device");
     
     // Usamos patchDocument con merge para crear o actualizar el campo.
-    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), payload.raw(), "")) {
+    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), payload.raw(),"")) {
         successPrint("Dispositivo vinculado al usuario (documento creado).");
     } else {
         errorPrint("Error al crear/actualizar documento de usuario: " + fbdo.errorReason());
