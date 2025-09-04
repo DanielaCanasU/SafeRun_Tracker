@@ -38,7 +38,9 @@ bool startFirebase() {
     auth.user.password = USER_PASSWORD;
     config.token_status_callback = tokenStatusCallback;
     Firebase.reconnectNetwork(true);
+    Serial.println(ESP.getFreeHeap());
     Firebase.begin(&config, &auth);
+    Serial.println(ESP.getFreeHeap());
     debugPrint("Firebase started");
     return true;
 }

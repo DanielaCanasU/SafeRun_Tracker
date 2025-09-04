@@ -8,6 +8,7 @@ extern const char* WIFI_PASSWORD;
 // Firebase configuration
 extern const char* FIREBASE_API_KEY;
 extern const char* FIREBASE_PROJECT_ID;
+extern const char* FIREBASE_DATABASE_URL;
 extern const char* DEVICE_ID;
 extern const char* USER_EMAIL;
 extern const char* USER_PASSWORD;

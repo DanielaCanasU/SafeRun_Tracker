@@ -73,8 +73,6 @@ bool isFirebaseReady();
  */
 String getFirebaseError();
 
-void deleteOldFirestoreData(int days);
-
 /**
  * @brief Get Firestore timestamp in ISO format
  * @return Timestamp string in ISO format

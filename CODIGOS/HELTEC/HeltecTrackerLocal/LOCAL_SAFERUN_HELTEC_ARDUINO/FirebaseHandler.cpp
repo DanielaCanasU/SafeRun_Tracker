@@ -21,25 +21,38 @@ FirebaseConfig config;
 
 bool initFirebaseHandler() {
     // Deprecated behavior: do not auto-connect WiFi here anymore.
-    // Keep only object setup; actual Firebase begin will be in startFirebase()
-    fbdo.setBSSLBufferSize(4096, 1024);
-    fbdo.setResponseSize(2048);
+    // Object setup is done before begin.
+    // Buffer sizes will be set in startFirebase just before Firebase.begin().
     return true;
 }
 
 bool startFirebase() {
     if (WiFi.status() != WL_CONNECTED) {
         errorPrint("WiFi not connected. Cannot start Firebase.");
+        // Intentar liberar memoria
+        forceGarbageCollection();
+        delay(1000);
         return false;
     }
     
     // Verificar memoria antes de iniciar Firebase
-    if (ESP.getFreeHeap() < 20000) {
+    // Firebase.begin() can consume a lot of heap for TLS buffers.
+    // 40KB is a safer threshold.
+    if (ESP.getFreeHeap() < 40000) {
         errorPrint("Memoria insuficiente para iniciar Firebase");
+        Serial.printf("Memoria libre: %d bytes\n", ESP.getFreeHeap());
         return false;
     }
     
     debugPrint("Configurando Firebase...");
+    
+    // Set buffer sizes just before starting Firebase.
+    // The previous values (512, 256) might be too small for a stable TLS handshake.
+    // Let's try with slightly larger, more balanced values.
+    // RX buffer is for incoming data, TX for outgoing.
+    // If you still have issues, you might need to experiment with these.
+    fbdo.setBSSLBufferSize(4096, 1024); // RX, TX
+    fbdo.setResponseSize(2048);
     
     // Configurar Firebase con delays para evitar problemas
     config.api_key = FIREBASE_API_KEY;
@@ -48,11 +61,18 @@ bool startFirebase() {
     config.token_status_callback = tokenStatusCallback;
     
     // Pequeño delay antes de iniciar
-    delay(100);
-    
+    delay(10000);
+    Serial.println("hola");
+
     Firebase.reconnectNetwork(true);
+    Serial.println("hola");
+    Serial.println("Memoria libre ANTES de Firebase.begin():");
+    Serial.println(ESP.getFreeHeap());
     Firebase.begin(&config, &auth);
-    
+    Serial.println("Memoria libre DESPUES de Firebase.begin():");
+    Serial.println(ESP.getFreeHeap());
+    Serial.println("hola");
+
     // Pequeño delay después de iniciar
     delay(100);
     
@@ -93,6 +113,9 @@ bool setupWiFi() {
     if (WiFi.status() == WL_CONNECTED) {
         successPrint("WiFi conectado. Dirección IP: " + WiFi.localIP().toString());
         Serial.printf("Memoria libre después de conexión: %d bytes\n", ESP.getFreeHeap());
+        // Disable WiFi power saving to improve stability, at the cost of higher power consumption.
+        // This can sometimes help with random disconnects or crashes.
+        WiFi.setSleep(false);
         return true;
     } else {
         errorPrint("WiFi connection failed after " + String(attempts) + " attempts");
@@ -206,7 +229,7 @@ bool asociarLinkRequest() {
     }
     
    
-    DynamicJsonDocument doc(2048);
+    DynamicJsonDocument doc(4096); // Aumentado para evitar desbordamiento
     DeserializationError error = deserializeJson(doc, fbdo.payload());
     
     if (error) {
@@ -229,7 +252,7 @@ bool asociarLinkRequest() {
     // Paso 1: Leer documento del usuario
     if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str())) {
         if (fbdo.httpCode() == FIREBASE_ERROR_HTTP_CODE_OK) {
-            // El documento existe, leer dispositivos existentes
+            // El documento existe, leer dispositivos existentes y añadir el nuevo
             DynamicJsonDocument doc(2048);
             DeserializationError error = deserializeJson(doc, fbdo.payload());
             
@@ -247,34 +270,25 @@ bool asociarLinkRequest() {
                 
                 if (deviceExists) {
                     successPrint("Dispositivo ya está vinculado al usuario.");
-                    return true;
-                }
-                
-                // Construir array con dispositivos existentes + nuevo
-                FirebaseJson payload;
-                int index = 0;
-                
-                // Agregar dispositivos existentes
-                for (JsonObject device : devices) {
-                    const char* existingDeviceId = device["stringValue"];
-                    payload.set("fields/devices/arrayValue/values/[" + String(index) + "]/stringValue", String(existingDeviceId));
-                    index++;
-                }
-                
-                // Agregar el nuevo dispositivo
-                payload.set("fields/devices/arrayValue/values/[" + String(index) + "]/stringValue", DEVICE_ID);
-                
-                debugPrint("Updating user document with existing devices + new device");
-                debugPrint("Payload JSON: " + String(payload.raw()));
-                
-                if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), "", "", payload.raw(), "devices")) {
-                    successPrint("Dispositivo vinculado al usuario (array actualizado).");
-                    return true;
+                    // Aunque ya exista, procedemos a aceptar y borrar la solicitud.
                 } else {
-                    errorPrint("Error al actualizar array: " + fbdo.errorReason());
-                    return false;
+                    // Construir array con dispositivos existentes + nuevo
+                    FirebaseJsonArray newDevices;
+                    newDevices.add(DEVICE_ID);
+                    for (JsonObject device : devices) {
+                        newDevices.add(device["stringValue"].as<const char*>());
+                    }
+                    
+                    FirebaseJson updateContent;
+                    updateContent.set("fields/devices", newDevices);
+                    
+                    if (!Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), updateContent.raw(), "devices")) {
+                         errorPrint("Error al actualizar array de dispositivos: " + fbdo.errorReason());
+                         return false;
+                    }
+                    successPrint("Dispositivo añadido a la lista del usuario.");
                 }
-            }
+            } 
         }
     }
     
@@ -283,15 +297,15 @@ bool asociarLinkRequest() {
     payload.set("fields/devices/arrayValue/values/[0]/stringValue", DEVICE_ID);
     
     debugPrint("Creating new user document with device");
-    debugPrint("Payload JSON: " + String(payload.raw()));
     
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), payload.raw())) {
+    // Usamos patchDocument con merge para crear o actualizar el campo.
+    if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "", userDocumentPath.c_str(), payload.raw(), "")) {
         successPrint("Dispositivo vinculado al usuario (documento creado).");
-        return true;
     } else {
-        errorPrint("Error al crear documento: " + fbdo.errorReason());
+        errorPrint("Error al crear/actualizar documento de usuario: " + fbdo.errorReason());
         return false;
     }
+    return true;
 }
 
 bool acceptLinkRequest() {
@@ -354,75 +368,7 @@ String getFirebaseError() {
     return fbdo.errorReason();
 }
 
-void deleteOldFirestoreData(int days) {
-    // Calcular el timestamp límite
-    time_t now = time(nullptr);
-    now -= days * 24 * 60 * 60; // Restar días
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    char limitTimestamp[20];
-    strftime(limitTimestamp, sizeof(limitTimestamp), "%Y%m%d%H%M%S", &timeinfo);
 
-    String url = "https://firestore.googleapis.com/v1/projects/";
-    url += FIREBASE_PROJECT_ID;
-    url += "/databases/(default)/documents/deviceData/";
-    url += DEVICE_ID;
-    url += "/data?pageSize=1000";
-
-    HTTPClient http;
-    http.begin(url);
-    String authHeader = String("Bearer ") + String(config.signer.tokens.jwt.c_str());
-    http.addHeader("Authorization", authHeader);
-
-    int httpCode = http.GET();
-    if (httpCode == 200) {
-        String payload = http.getString();
-        DynamicJsonDocument doc(16384);
-        DeserializationError error = deserializeJson(doc, payload);
-        if (error) {
-            errorPrint("Error parsing JSON: " + String(error.c_str()));
-            http.end();
-            return;
-        }
-
-        if (!doc.containsKey("documents")) {
-            debugPrint("No documents to delete.");
-            http.end();
-            return;
-        }
-
-        JsonArray docs = doc["documents"].as<JsonArray>();
-        for (JsonObject d : docs) {
-            String name = d["name"].as<String>();
-            int lastSlash = name.lastIndexOf('/');
-            String docId = name.substring(lastSlash + 1);
-
-            // Si el docId (timestamp) es menor al límite, borrar
-            if (docId < String(limitTimestamp)) {
-                String delUrl = "https://firestore.googleapis.com/v1/projects/";
-                delUrl += FIREBASE_PROJECT_ID;
-                delUrl += "/databases/(default)/documents/deviceData/";
-                delUrl += DEVICE_ID;
-                delUrl += "/data/" + docId;
-
-                HTTPClient delHttp;
-                delHttp.begin(delUrl);
-                String delAuthHeader = String("Bearer ") + String(config.signer.tokens.jwt.c_str());
-                delHttp.addHeader("Authorization", delAuthHeader);
-                int delCode = delHttp.sendRequest("DELETE");
-                if (delCode == 200) {
-                    debugPrint("Documento viejo eliminado: " + docId);
-                } else {
-                    errorPrint("Error al eliminar: " + docId + " code: " + String(delCode));
-                }
-                delHttp.end();
-            }
-        }
-    } else {
-        errorPrint("Error al listar documentos: " + String(httpCode));
-    }
-    http.end();
-}
 
 String getFirestoreTimestamp() {
     time_t now = time(nullptr);
@@ -484,5 +430,3 @@ bool publishAlertToFirestore(const SensorData& data) {
         return false;
     }
 }
-
-

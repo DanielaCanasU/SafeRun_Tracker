@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "AppState.h"
 #include "TrackingData.h"
+#include "FirebaseHandler.h"
 #include <WiFi.h>
 #include <Preferences.h>
 
@@ -18,7 +19,7 @@ static void renderInfoScreen();
 #define ST7735_GRAY ST7735_COLOR565(128, 128, 128)
 
 // Menu state (mirrors ESP32 OLEDMenu)
-enum class MenuScreen { Welcome, SelectMode, WiFiMenu, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager };
+enum class MenuScreen { Welcome, SelectMode, WiFiMenu, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing };
 static MenuScreen currentScreen = MenuScreen::Welcome;
 static bool wifiConnected = false;
 
@@ -46,8 +47,6 @@ static int wifiMenuIdx = 0; // 0 = Escanear redes, 1 = Estado
 static bool wifiConnectingActive = false;
 static unsigned long wifiConnLastCheckMs = 0;
 static int wifiConnTries = 0;
-static Preferences wifiPrefs;
-static bool wifiPrefsReady = false;
 
 static const char allowedChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-.*";
 static const int allowedCharsCount = sizeof(allowedChars) - 1;
@@ -73,8 +72,14 @@ static float lastSnr = -999.0f;
 static bool lastSensor4 = false;
 
 // Add main menu state variables
-static int mainMenuIdx = 0; // 0 = Modo, 1 = WiFi, 2 = Datos Locales, 3 = Info, 4 = Rastreo, 5 = Backtrack
+static int mainMenuIdx = 0; // 0 = Modo, 1 = WiFi, 2 = Datos Locales, 3 = Info, 4 = Rastreo, 5 = Backtrack, 6 = Emparejar
 static int lastMainMenuIdx = -1;
+
+// Pairing system variables
+static bool pairingRequestPending = false;
+static String pairingDeviceId = "";
+static unsigned long lastPairingCheck = 0;
+static const unsigned long PAIRING_CHECK_INTERVAL = 5000; // 5 segundos
 
 // Tracking system variables
 static TrackingData targetData;
@@ -103,8 +108,9 @@ static const int MAX_WAYPOINTS = 10;
 static Waypoint waypoints[MAX_WAYPOINTS];
 static int waypointCount = 0;
 static int selectedWaypointIndex = -1;
-static Preferences waypointPrefs;
-static bool waypointPrefsReady = false;
+
+// Variables de scroll para waypoints
+static int waypointScrollOffset = 0;
 
 // Navegación hacia waypoint seleccionado
 static NavigationData waypointNavigation;
@@ -397,39 +403,74 @@ static void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bg
         drawLine(x + b*3 + 3, barY, x + b*3 + 3, barY + barHeight, barColor);
       }
     } break;
-    case 2: { // Datos Locales: larger storage box
-      drawLine(x + 2, y + 4, x + 15, y + 4, fg);
-      drawLine(x + 2, y + 14, x + 15, y + 14, fg);
-      drawLine(x + 2, y + 4, x + 2, y + 14, fg);
-      drawLine(x + 15, y + 4, x + 15, y + 14, fg);
-      // divider
-      drawLine(x + 2, y + 9, x + 15, y + 9, fg);
+         case 2: { // Remoto: icono de antena/satélite
+       // Antena principal
+       drawLine(x + 9, y + 2, x + 9, y + 16, fg);
+       // Base de la antena
+       drawLine(x + 6, y + 16, x + 12, y + 16, fg);
+       // Ondas de señal (arco superior)
+       for (int i = 0; i < 3; i++) {
+         int waveY = y + 4 + i * 3;
+         int waveW = 6 + i * 2;
+         drawLine(x + 9 - waveW/2, waveY, x + 9 + waveW/2, waveY, fg);
+       }
     } break;
-    case 3: { // Info: larger circle with i
+     case 3: { // Local: icono de casa/localización
+       // Base de la casa
+       drawLine(x + 3, y + 12, x + 15, y + 12, fg);
+       // Lados de la casa
+       drawLine(x + 3, y + 12, x + 3, y + 16, fg);
+       drawLine(x + 15, y + 12, x + 15, y + 16, fg);
+       // Techo triangular
+       drawLine(x + 3, y + 12, x + 9, y + 6, fg);
+       drawLine(x + 9, y + 6, x + 15, y + 12, fg);
+       // Puerta
+       drawLine(x + 7, y + 12, x + 7, y + 16, fg);
+       drawLine(x + 11, y + 12, x + 11, y + 16, fg);
+       drawLine(x + 7, y + 12, x + 11, y + 12, fg);
+     } break;
+     case 4: { // Rastreo: brújula/radar icon más visible
+       // Círculo exterior más grueso
+       drawCircle(x + 9, y + 9, 7, fg);
+       drawCircle(x + 9, y + 9, 6, fg);
+       // Flecha central más gruesa apuntando hacia arriba
+       drawLine(x + 8, y + 2, x + 8, y + 16, fg);
+       drawLine(x + 9, y + 2, x + 9, y + 16, fg);
+       drawLine(x + 10, y + 2, x + 10, y + 16, fg);
+       // Puntas de la flecha más grandes
+       drawLine(x + 8, y + 2, x + 5, y + 6, fg);
+       drawLine(x + 10, y + 2, x + 13, y + 6, fg);
+       // Marcas cardinales más visibles
+       drawLine(x + 9, y + 1, x + 9, y + 4, fg); // Norte
+       drawLine(x + 9, y + 14, x + 9, y + 17, fg); // Sur
+       drawLine(x + 1, y + 9, x + 4, y + 9, fg); // Oeste
+       drawLine(x + 14, y + 9, x + 17, y + 9, fg); // Este
+     } break;
+     case 5: { // Backtrack: flecha de retorno simple y clara
+       // Flecha de retorno simple (forma de L invertida)
+       drawLine(x + 12, y + 2, x + 12, y + 16, fg); // Línea vertical
+       drawLine(x + 12, y + 16, x + 4, y + 16, fg); // Línea horizontal izquierda
+       // Punta de la flecha apuntando hacia la izquierda
+       drawLine(x + 4, y + 16, x + 7, y + 13, fg);
+       drawLine(x + 4, y + 16, x + 7, y + 16, fg);
+       drawLine(x + 7, y + 13, x + 7, y + 16, fg);
+     } break;
+     case 6: { // Info: círculo con i
       drawCircle(x + 9, y + 9, 7, fg);
       drawLine(x + 9, y + 6, x + 9, y + 11, fg);
       st7735.st7735_draw_pixel(x + 9, y + 5, fg);
     } break;
-         case 4: { // Rastreo: brújula/radar icon
-       // Círculo exterior
-       drawCircle(x + 9, y + 9, 7, fg);
-       // Flecha central apuntando hacia arriba
-       drawLine(x + 9, y + 2, x + 9, y + 16, fg);
-       // Puntas de la flecha
-       drawLine(x + 9, y + 2, x + 6, y + 5, fg);
-       drawLine(x + 9, y + 2, x + 12, y + 5, fg);
-     } break;
-     case 5: { // Backtrack: flecha de retorno
-       // Círculo exterior
-       drawCircle(x + 9, y + 9, 7, fg);
-       // Flecha curva de retorno (forma de U)
-       drawLine(x + 9, y + 2, x + 9, y + 12, fg); // Línea vertical
-       drawLine(x + 9, y + 12, x + 2, y + 12, fg); // Línea horizontal izquierda
-       drawLine(x + 2, y + 12, x + 2, y + 16, fg); // Línea vertical izquierda
-       // Puntas de la flecha
-       drawLine(x + 2, y + 16, x + 5, y + 13, fg);
-       drawLine(x + 2, y + 16, x + 5, y + 16, fg);
-     } break;
+     case 7: { // Emparejar: icono de dos dispositivos conectados
+       // Dispositivo izquierdo
+       drawCircle(x + 4, y + 9, 3, fg);
+       // Dispositivo derecho
+       drawCircle(x + 14, y + 9, 3, fg);
+       // Línea de conexión entre dispositivos
+       drawLine(x + 7, y + 9, x + 11, y + 9, fg);
+       // Puntos de conexión en cada dispositivo
+       drawLine(x + 6, y + 9, x + 8, y + 9, fg);
+       drawLine(x + 10, y + 9, x + 12, y + 9, fg);
+    } break;
   }
 }
 
@@ -442,7 +483,7 @@ static void renderMainMenu() {
     st7735.st7735_fill_rectangle(0, 10, 128, 70, ST7735_BLACK);
 
     // Menu options
-    const char* menuItems[] = {"Modo", "WiFi", "Datos Locales", "Info", "Rastreo", "Backtrack"};
+     const char* menuItems[] = {"Modo", "WiFi", "Remoto", "Local", "Rastreo", "Backtrack", "Emparejar"};
 
     // Draw option above (if exists)
     if (mainMenuIdx > 0) {
@@ -462,17 +503,33 @@ static void renderMainMenu() {
     // Calculate centered positions for selected item
     int selectedIconX = 35; // Center of screen
     int selectedTextX = 55; // Icon center + icon width/2 + spacing
+     
+     // Ajustar posición del texto "Backtrack" para centrarlo visualmente
+     if (mainMenuIdx == 5) { // Backtrack
+       selectedTextX = 35; // Comenzar antes para centrar visualmente
+     }
+     
     // Icon for selected (on white bg) - centered
     drawMenuIcon(selectedIconX, 34, mainMenuIdx, true, ST7735_WHITE);
     write_str_bold(selectedTextX, 38, selectedText.c_str(), Font_11x18, ST7735_BLACK, ST7735_WHITE);
 
     // Draw option below (if exists)
-    if (mainMenuIdx < 5) { // Cambiado de 3 a 5 para mostrar la opción de abajo
+      if (mainMenuIdx < 6) { // Cambiado de 5 a 6 para mostrar la opción de abajo
       int belowIdx = mainMenuIdx + 1;
       String belowText = String("v ") + String(menuItems[belowIdx]);
       // Calculate centered positions
       int belowIconX = 35; // Center of screen
       int belowTextX = 55; // Icon center + icon width/2 + spacing
+       
+               // Ajustar posición del texto "Backtrack" si está abajo
+        if (belowIdx == 5) { // Backtrack
+          belowTextX = 45; // Comenzar antes para centrar visualmente
+        }
+        // Ajustar posición del texto "Emparejar" si está abajo
+        if (belowIdx == 6) { // Emparejar
+          belowTextX = 40; // Comenzar antes para centrar visualmente
+        }
+       
       // Icon for below (on black bg) - centered
       drawMenuIcon(belowIconX, 61, belowIdx, false, ST7735_BLACK);
       st7735.st7735_write_str(belowTextX, 65, belowText.c_str(), Font_7x10, ST7735_GRAY, ST7735_BLACK);
@@ -485,7 +542,7 @@ static void renderMainMenu() {
 
 static void renderMode() {
   bool remoteMode = isRemoteModeSelected();
-
+  
   // Solo redibujar si cambia el modo o la pantalla
   if (lastRenderedScreen != MenuScreen::SelectMode || lastRemoteMode != remoteMode) {
     drawHeaderWithWiFi("Seleccionar Modo");
@@ -706,6 +763,59 @@ static void renderTracking() {
   }
 }
 
+// ===== PANTALLA DE EMPAREJAMIENTO =====
+
+// Pantalla de emparejamiento
+static void renderPairing() {
+  if (lastRenderedScreen != MenuScreen::Pairing) {
+    drawHeaderWithWiFi("Emparejar");
+    lastRenderedScreen = MenuScreen::Pairing;
+  }
+  
+  // Verificar estado de WiFi
+  bool wifiConnected = WiFi.status() == WL_CONNECTED;
+  
+  if (!wifiConnected) {
+    // Sin WiFi, mostrar mensaje de error
+    st7735.st7735_write_str(0, 20, "WiFi no conectado", Font_7x10, ST7735_RED);
+    st7735.st7735_write_str(0, 32, "Conectate a WiFi para", Font_7x10, ST7735_WHITE);
+    st7735.st7735_write_str(0, 44, "recibir solicitudes", Font_7x10, ST7735_WHITE);
+    
+    drawFooter("BACK: Volver al menu");
+    return;
+  }
+  
+  // Verificar si hay solicitudes de emparejamiento pendientes
+  if (pairingRequestPending) {
+    // Mostrar solicitud pendiente
+    st7735.st7735_write_str(0, 20, "Solicitud de emparejamiento", Font_7x10, NARANJA);
+    st7735.st7735_write_str(0, 32, "Dispositivo:", Font_7x10, ST7735_WHITE);
+    
+    // Mostrar ID del dispositivo (truncado si es muy largo)
+    String deviceId = pairingDeviceId;
+    if (deviceId.length() > 20) {
+      deviceId = deviceId.substring(0, 17) + "...";
+    }
+    st7735.st7735_write_str(0, 44, deviceId.c_str(), Font_7x10, MORADO);
+    
+    // Botón de aceptar
+    fillRectPixels(20, 60, 120, 20, MORADO);
+    st7735.st7735_write_str(45, 65, "ACEPTAR", Font_7x10, ST7735_WHITE, MORADO);
+    
+    drawFooter("OK: Aceptar | BACK: Rechazar");
+  } else {
+    // Sin solicitudes pendientes
+    st7735.st7735_write_str(0, 20, "No hay solicitudes", Font_7x10, ST7735_GRAY);
+    st7735.st7735_write_str(0, 32, "de emparejamiento", Font_7x10, ST7735_GRAY);
+    st7735.st7735_write_str(0, 44, "pendientes", Font_7x10, ST7735_GRAY);
+    
+    // Indicador de estado
+    st7735.st7735_write_str(0, 60, "Estado: Esperando...", Font_7x10, ST7735_WHITE);
+    
+    drawFooter("BACK: Volver al menu");
+  }
+}
+
 // ===== PANTALLAS DE BACKTRACK =====
 
 // Pantalla de gestión de waypoints
@@ -719,13 +829,12 @@ static void renderWaypointManager() {
   }
   
   // Sistema de scroll para waypoints (mostrar solo 3 por pantalla)
-  static int scrollOffset = 0;
   int maxScrollOffset = max(0, waypointCount - 3);
   
   // Mostrar solo 3 waypoints por pantalla
-  int yPos = 16;
-  for (int i = 0; i < 3 && (i + scrollOffset) < waypointCount; i++) {
-    int actualIndex = i + scrollOffset;
+  int yPos = 16 ;
+  for (int i = 0; i < 3 && (i + waypointScrollOffset) < waypointCount; i++) {
+    int actualIndex = i + waypointScrollOffset;
     String waypointText = String(actualIndex + 1) + ". " + waypoints[actualIndex].name;
     if (waypointText.length() > 18) {
       waypointText = waypointText.substring(0, 15) + "...";
@@ -736,17 +845,17 @@ static void renderWaypointManager() {
     
     // Mostrar coordenadas abreviadas
     String coords = String(waypoints[actualIndex].latitude, 4) + "," + String(waypoints[actualIndex].longitude, 4);
-    st7735.st7735_write_str(0, yPos + 8, coords.c_str(), Font_7x10, ST7735_GRAY);
+    st7735.st7735_write_str(0, yPos + 10, coords.c_str(), Font_7x10, ST7735_GRAY);
     
-    yPos += 16;
+    yPos += 20;
   }
   
   // Indicadores de scroll
   if (waypointCount > 3) {
-    if (scrollOffset > 0) {
+    if (waypointScrollOffset > 0) {
       st7735.st7735_write_str(140, 16, "^", Font_7x10, ST7735_GRAY); // Flecha arriba
     }
-    if (scrollOffset < maxScrollOffset) {
+    if (waypointScrollOffset < maxScrollOffset) {
       st7735.st7735_write_str(140, 56, "v", Font_7x10, ST7735_GRAY); // Flecha abajo
     }
   }
@@ -756,12 +865,12 @@ static void renderWaypointManager() {
     st7735.st7735_write_str(0, 40, "No hay puntos guardados", Font_7x10, ST7735_GRAY);
     st7735.st7735_write_str(0, 52, "OK3s: Agregar punto", Font_7x10, NARANJA);
   } else {
-    st7735.st7735_write_str(0, 50, "OK: Entrar a punto", Font_7x10, ST7735_WHITE);
-    st7735.st7735_write_str(0, 60, "OK3s: Agregar punto", Font_7x10, NARANJA);
-    st7735.st7735_write_str(0, 70, "BACK: Eliminar punto", Font_7x10, ST7735_RED);
+    //st7735.st7735_write_str(0, 50, "OK: Entrar a punto", Font_7x10, ST7735_WHITE);
+    //st7735.st7735_write_str(0, 60, "OK3s: Agregar punto", Font_7x10, NARANJA);
+    //st7735.st7735_write_str(0, 70, "BACK: Eliminar punto", Font_7x10, ST7735_RED);
   }
   
- drawFooter("BACK: eliminar | BACK3s: menu | OK3s: agregar");
+ //drawFooter("BACK: eliminar | BACK3s: menu | OK3s: agregar");
 }
 
 // Pantalla de navegación hacia waypoint (backtrack)
@@ -775,18 +884,18 @@ static void renderBacktrack() {
     // Sin waypoint seleccionado
     st7735.st7735_write_str(0, 20, "Selecciona un punto", Font_7x10, ST7735_GRAY);
     st7735.st7735_write_str(0, 32, "desde Gestionar Puntos", Font_7x10, ST7735_GRAY);
-         st7735.st7735_write_str(0, 44, "para comenzar navegacion", Font_7x10, ST7735_WHITE);
-     drawFooter("OK: waypoints | BACK: menu");
-     return;
-   }
-   
-   if (!localPositionSet) {
-     // Sin GPS local
-     st7735.st7735_write_str(0, 20, "GPS Local no disponible", Font_7x10, ST7735_RED);
-     st7735.st7735_write_str(0, 32, "Esperando señal GPS...", Font_7x10, ST7735_GRAY);
-     drawFooter("OK: waypoints | BACK: menu");
-     return;
-   }
+              st7735.st7735_write_str(0, 44, "para comenzar navegacion", Font_7x10, ST7735_WHITE);
+      drawFooter("OK: waypoints | BACK: menu");
+      return;
+    }
+    
+    if (!localPositionSet) {
+      // Sin GPS local
+      st7735.st7735_write_str(0, 20, "GPS Local no disponible", Font_7x10, ST7735_RED);
+      st7735.st7735_write_str(0, 32, "Esperando señal GPS...", Font_7x10, ST7735_GRAY);
+      drawFooter("OK: waypoints | BACK: menu");
+      return;
+    }
   
   // Actualizar navegación
   updateWaypointNavigation();
@@ -815,7 +924,7 @@ static void renderBacktrack() {
   st7735.st7735_write_str(100, 0, "GPS", Font_7x10, MORADO);
   
      // Footer con instrucciones
-   drawFooter("OK: waypoints | BACK: menu");
+  // drawFooter("OK: waypoints | BACK: menu");
 }
 
 void initUI() {
@@ -829,16 +938,19 @@ void initUI() {
   st7735.st7735_init();
 
   // Initialize wifi preferences storage (NVS)
-  if (!wifiPrefsReady) {
+  {
+    Preferences wifiPrefs;
     wifiPrefs.begin("wifi", false);
-    wifiPrefsReady = true;
+    // Leer datos si es necesario aquí
+    wifiPrefs.end();
   }
-  
+
   // Initialize waypoint preferences storage (NVS)
-  if (!waypointPrefsReady) {
+  {
+    Preferences waypointPrefs;
     waypointPrefs.begin("waypoints", false);
-    waypointPrefsReady = true;
     loadWaypointsFromStorage();
+    waypointPrefs.end();
   }
 
   // Start with welcome screen
@@ -873,15 +985,13 @@ void renderWelcomeScreen() {
   // Esperar un tiempo antes de pasar al menú principal
   if (elapsed > WELCOME_DURATION) {
     welcomeScreenShown = true;
-    currentScreen = MenuScreen::WiFiMenu;
+  currentScreen = MenuScreen::WiFiMenu;
     lastRenderedScreen = MenuScreen::Welcome;
-    renderMainMenu();
+  renderMainMenu();
   }
 }
 
-void renderBlinkingEyes() {
-  drawBlinkingEyes();
-}
+
 
 void renderWelcomeMessage() {
   drawWelcomeMessage();
@@ -924,9 +1034,9 @@ void updateUI(unsigned long now) {
   // Handle button input
   switch (currentScreen) {
     case MenuScreen::WiFiMenu: {
-                     // Main menu navigation
-        if (readBtnUp())   mainMenuIdx = (mainMenuIdx - 1 + 6) % 6;
-        if (readBtnDown()) mainMenuIdx = (mainMenuIdx + 1) % 6;
+             // Main menu navigation
+                 if (readBtnUp())   mainMenuIdx = (mainMenuIdx - 1 + 7) % 7;
+         if (readBtnDown()) mainMenuIdx = (mainMenuIdx + 1) % 7;
       
       // Check for short press to enter submenu
       static bool okWasPressed = false;
@@ -954,7 +1064,8 @@ void updateUI(unsigned long now) {
                case 2: currentScreen = MenuScreen::LocalData; break;
                case 3: currentScreen = MenuScreen::Info; break;
                case 4: currentScreen = MenuScreen::Tracking; break;
-               case 5: currentScreen = MenuScreen::WaypointManager; break; // Gestionar waypoints
+                case 5: currentScreen = MenuScreen::WaypointManager; break; // Gestionar waypoints
+                case 6: currentScreen = MenuScreen::Pairing; break; // Pantalla de emparejamiento
              }
           }
         }
@@ -965,7 +1076,7 @@ void updateUI(unsigned long now) {
     case MenuScreen::SelectMode: {
       if (readBtnUp() || readBtnDown()) {
         setRemoteMode(!isRemoteModeSelected());
-        lastRemoteMode = !lastRemoteMode; // También actualizar el cache
+         lastRemoteMode = !lastRemoteMode; // También actualizar el cache
       }
       
       // Check for long press (3 seconds) to go back to main menu
@@ -984,6 +1095,12 @@ void updateUI(unsigned long now) {
       } else {
         // Reset long press detection when button is released
         okWasPressed = false;
+      }
+       
+       // BACK corto: volver al menú principal
+       if (readBtnBack()) {
+         currentScreen = MenuScreen::WiFiMenu;
+         lastRenderedScreen = MenuScreen::Info;
       }
     } break;
     
@@ -1019,6 +1136,12 @@ void updateUI(unsigned long now) {
         }
         okWasPressed = false;
       }
+       
+       // BACK corto: volver al menú principal
+       if (readBtnBack()) {
+         currentScreen = MenuScreen::WiFiMenu;
+         lastRenderedScreen = MenuScreen::Info;
+      }
     } break;
     
     case MenuScreen::WiFiSelectSSID:
@@ -1026,21 +1149,57 @@ void updateUI(unsigned long now) {
       if (readBtnUp())   selectedNetworkIdx = (selectedNetworkIdx - 1 + numNetworks) % numNetworks;
       if (readBtnDown()) selectedNetworkIdx = (selectedNetworkIdx + 1) % numNetworks;
       if (readBtnOk()) {
+        String savedSsid, savedPass;
+        {
+          Preferences wifiPrefs;
+          wifiPrefs.begin("wifi", false);
+          savedSsid = wifiPrefs.getString("ssid", "");
+          savedPass = wifiPrefs.getString("pass", "");
+          wifiPrefs.end();
+        }
         selectedSSID = WiFi.SSID(selectedNetworkIdx);
-        if (!wifiPrefsReady) { wifiPrefs.begin("wifi", false); wifiPrefsReady = true; }
-        String savedSsid = wifiPrefs.getString("ssid", "");
-        String savedPass = wifiPrefs.getString("pass", "");
         if (savedSsid == selectedSSID) enteredPassword = savedPass; else enteredPassword = "";
         charIndex = 0; currentScreen = MenuScreen::WiFiEnterPassword;
+       }
+       
+       // BACK corto: volver al menú anterior
+       if (readBtnBack()) {
+         currentScreen = MenuScreen::WiFiSubMenu;
+         lastRenderedScreen = MenuScreen::Info;
       }
       break;
     case MenuScreen::WiFiEnterPassword: {
       if (readBtnUp())   charIndex = (charIndex + 1) % allowedCharsCount;
       if (readBtnDown()) charIndex = (charIndex - 1 + allowedCharsCount) % allowedCharsCount;
+       
+       // Manejo del botón BACK (corto y largo)
+       static bool backPwdWasPressed = false;
+       static unsigned long backPwdDownMs = 0;
+       static const unsigned long backPwdLongPressMs = 3000;
+       
       if (readBtnBack()) {
-        if (enteredPassword.length() > 0) enteredPassword.remove(enteredPassword.length() - 1);
-        else currentScreen = MenuScreen::WiFiSelectSSID;
-      }
+         if (!backPwdWasPressed) {
+           backPwdDownMs = now;
+           backPwdWasPressed = true;
+         } else if (now - backPwdDownMs >= backPwdLongPressMs) {
+           // BACK largo (3s): borrar último carácter
+           if (enteredPassword.length() > 0) {
+             enteredPassword.remove(enteredPassword.length() - 1);
+           }
+           backPwdWasPressed = false;
+         }
+       } else {
+         // Botón liberado
+         if (backPwdWasPressed) {
+           unsigned long pressDuration = now - backPwdDownMs;
+           if (pressDuration >= 50 && pressDuration < backPwdLongPressMs) {
+             // BACK corto: volver al menú anterior
+             currentScreen = MenuScreen::WiFiSelectSSID;
+           }
+         }
+         backPwdWasPressed = false;
+       }
+       
       static bool okPwdWasPressed = false; static unsigned long okPwdDownMs = 0; const unsigned long longPressMs = 1200;
       bool okP = readBtnOk();
       if (okP) { if (!okPwdWasPressed) okPwdDownMs = now; okPwdWasPressed = true; }
@@ -1049,19 +1208,19 @@ void updateUI(unsigned long now) {
           unsigned long dur = now - okPwdDownMs;
           if (dur >= longPressMs) {
             currentScreen = MenuScreen::WiFiConnecting; renderConnecting();
-            
-            // Limpiar conexión previa antes de intentar nueva conexión
-            WiFi.disconnect(true);
-            delay(1000);
-            
-            // Configurar WiFi con mejor manejo de errores
-            WiFi.mode(WIFI_STA);
-            
-            // Intentar conexión
-            WiFi.begin(selectedSSID.c_str(), enteredPassword.c_str());
-            wifiConnectingActive = true; 
-            wifiConnLastCheckMs = now; 
-            wifiConnTries = 0;
+             
+             // Limpiar conexión previa antes de intentar nueva conexión
+             WiFi.disconnect(true);
+             delay(1000);
+             
+             // Configurar WiFi con mejor manejo de errores
+             WiFi.mode(WIFI_STA);
+             
+             // Intentar conexión
+             WiFi.begin(selectedSSID.c_str(), enteredPassword.c_str());
+             wifiConnectingActive = true; 
+             wifiConnLastCheckMs = now; 
+             wifiConnTries = 0;
           } else if (dur >= 50) {
             enteredPassword += allowedChars[charIndex];
           }
@@ -1071,25 +1230,45 @@ void updateUI(unsigned long now) {
     } break;
     case MenuScreen::WiFiConnecting:
       if (wifiConnTries > 0 && (WiFi.status() == WL_CONNECTED || wifiConnTries > 30)) {
-        if (readBtnOk()) { 
-          wifiConnectingActive = false; 
-          currentScreen = MenuScreen::WiFiSubMenu; 
-          
-          // Limpiar recursos si la conexión falló
-          if (WiFi.status() != WL_CONNECTED) {
-            WiFi.disconnect(true);
-            delay(500);
-          }
-        }
+         if (readBtnOk()) { 
+           wifiConnectingActive = false; 
+           currentScreen = MenuScreen::WiFiSubMenu; 
+           
+           // Limpiar recursos si la conexión falló
+           if (WiFi.status() != WL_CONNECTED) {
+             WiFi.disconnect(true);
+             delay(500);
+           }
+         }
+       }
+       
+       // BACK corto: volver al menú anterior
+       if (readBtnBack()) {
+         wifiConnectingActive = false;
+         currentScreen = MenuScreen::WiFiSubMenu;
+         lastRenderedScreen = MenuScreen::Info;
       }
       break;
     case MenuScreen::WiFiStatus:
       if (readBtnOk()) { currentScreen = MenuScreen::WiFiSubMenu; lastRenderedScreen = MenuScreen::Info; }
+      
+      // BACK corto: volver al menú anterior
+      if (readBtnBack()) {
+        currentScreen = MenuScreen::WiFiSubMenu;
+        lastRenderedScreen = MenuScreen::Info;
+      }
       break;
          case MenuScreen::WiFiScan:
+       // BACK corto: volver al menú anterior
+       if (readBtnBack()) {
+         currentScreen = MenuScreen::WiFiSubMenu;
+         lastRenderedScreen = MenuScreen::Info;
+       }
+       break;
+       
      case MenuScreen::Info:
      case MenuScreen::LocalData:
-              case MenuScreen::Tracking:
+     case MenuScreen::Tracking:
       // Check for long press (3 seconds) to go to main menu from Info/LocalData screen
       if (readBtnOk()) {
         if (!infoOkWasPressed) {
@@ -1107,7 +1286,6 @@ void updateUI(unsigned long now) {
       
     case MenuScreen::WaypointManager: {
       // Navegación en la lista de waypoints con scroll
-      static int scrollOffset = 0;
       int maxScrollOffset = max(0, waypointCount - 3);
       
       if (readBtnUp()) {
@@ -1115,8 +1293,8 @@ void updateUI(unsigned long now) {
           selectedWaypointIndex = (selectedWaypointIndex - 1 + waypointCount) % waypointCount;
           
           // Ajustar scroll si es necesario
-          if (selectedWaypointIndex < scrollOffset) {
-            scrollOffset = max(0, selectedWaypointIndex);
+          if (selectedWaypointIndex < waypointScrollOffset) {
+            waypointScrollOffset = max(0, selectedWaypointIndex);
           }
         }
       }
@@ -1125,8 +1303,8 @@ void updateUI(unsigned long now) {
           selectedWaypointIndex = (selectedWaypointIndex + 1) % waypointCount;
           
           // Ajustar scroll si es necesario
-          if (selectedWaypointIndex >= scrollOffset + 3) {
-            scrollOffset = min(maxScrollOffset, selectedWaypointIndex - 2);
+          if (selectedWaypointIndex >= waypointScrollOffset + 3) {
+            waypointScrollOffset = min(maxScrollOffset, selectedWaypointIndex - 2);
           }
         }
       }
@@ -1139,12 +1317,18 @@ void updateUI(unsigned long now) {
           wpOkDownMs = now;
           wpOkWasPressed = true;
         } else if (now - wpOkDownMs >= wpLongPressMs) {
-          // OK largo (3s): agregar nuevo waypoint
-          if (waypointCount < MAX_WAYPOINTS && localPositionSet) {
-            String waypointName = "Punto " + String(waypointCount + 1);
-            saveCurrentPositionAsWaypoint(waypointName);
-            lastRenderedScreen = MenuScreen::Info; // Force redraw
-          }
+                     // OK largo (3s): agregar nuevo waypoint
+           if (waypointCount < MAX_WAYPOINTS && localPositionSet) {
+             String waypointName = "Punto " + String(waypointCount + 1);
+             saveCurrentPositionAsWaypoint(waypointName);
+             
+             // Ajustar scroll si es necesario para mostrar el nuevo punto
+             if (waypointCount > 3) {
+               waypointScrollOffset = max(0, waypointCount - 3);
+             }
+             
+             lastRenderedScreen = MenuScreen::Info; // Force redraw
+           }
           wpOkWasPressed = false;
         }
       } else {
@@ -1163,39 +1347,46 @@ void updateUI(unsigned long now) {
         wpOkWasPressed = false;
       }
       
-      // Manejo del botón BACK (corto y largo)
-      static bool wpBackWasPressed = false;
-      static unsigned long wpBackDownMs = 0;
-      static const unsigned long wpBackLongPressMs = 3000;
-      
-      if (readBtnBack()) {
-        if (!wpBackWasPressed) {
-          wpBackDownMs = now;
-          wpBackWasPressed = true;
-        } else if (now - wpBackDownMs >= wpBackLongPressMs) {
-          // BACK largo (3s): volver al menú principal
-          currentScreen = MenuScreen::WiFiMenu;
-          lastRenderedScreen = MenuScreen::Info;
-          wpBackWasPressed = false;
-        }
-      } else {
-        // Botón liberado
-        if (wpBackWasPressed) {
-          unsigned long pressDuration = now - wpBackDownMs;
-          if (pressDuration >= 50 && pressDuration < wpBackLongPressMs) {
-            // BACK corto: eliminar waypoint seleccionado
-            if (waypointCount > 0 && selectedWaypointIndex >= 0) {
-              deleteWaypoint(selectedWaypointIndex);
-              lastRenderedScreen = MenuScreen::Info; // Force redraw
+             // Manejo del botón BACK (corto y largo)
+       static bool wpBackWasPressed = false;
+       static unsigned long wpBackDownMs = 0;
+       static const unsigned long wpBackLongPressMs = 3000;
+       
+       if (readBtnBack()) {
+         if (!wpBackWasPressed) {
+           wpBackDownMs = now;
+           wpBackWasPressed = true;
+         } else if (now - wpBackDownMs >= wpBackLongPressMs) {
+          // BACK corto: eliminar waypoint seleccionado
+          if (waypointCount > 0 && selectedWaypointIndex >= 0) {
+            deleteWaypoint(selectedWaypointIndex);
+            
+            // Ajustar scroll si es necesario después de eliminar
+            int maxScrollOffset = max(0, waypointCount - 3);
+            if (waypointScrollOffset > maxScrollOffset) {
+              waypointScrollOffset = maxScrollOffset;
             }
+            
+            lastRenderedScreen = MenuScreen::Info; // Force redraw
           }
-        }
-        wpBackWasPressed = false;
-      }
-      break;
+         }
+       } else {
+         // Botón liberado
+         if (wpBackWasPressed) {
+           unsigned long pressDuration = now - wpBackDownMs;
+           if (pressDuration >= 50 && pressDuration < wpBackLongPressMs) {
+            // BACK largo (3s): volver al menú principal
+            currentScreen = MenuScreen::WiFiMenu;
+            lastRenderedScreen = MenuScreen::Info;
+            wpBackWasPressed = false;
+           }
+         }
+         wpBackWasPressed = false;
+       }
+       break;
     }
     
-         case MenuScreen::Backtrack: {
+              case MenuScreen::Backtrack: {
        // OK corto: volver a gestión de waypoints
        if (readBtnOk()) {
          currentScreen = MenuScreen::WaypointManager;
@@ -1216,13 +1407,73 @@ void updateUI(unsigned long now) {
          btOkWasPressed = false;
        }
        
-       // Botón BACK: volver al menú principal directamente
+       // Manejo del botón BACK (corto y largo) - LÓGICA CORREGIDA
+       static bool btBackWasPressed = false;
+       static unsigned long btBackDownMs = 0;
+       static const unsigned long btBackLongPressMs = 3000;
+       
        if (readBtnBack()) {
-         currentScreen = MenuScreen::WiFiMenu;
-         lastRenderedScreen = MenuScreen::Info;
-       }
-       break;
-     }
+         if (!btBackWasPressed) {
+           btBackDownMs = now;
+           btBackWasPressed = true;
+         }
+       } else {
+         // Botón liberado
+         if (btBackWasPressed) {
+           unsigned long pressDuration = now - btBackDownMs;
+           if (pressDuration >= 50 && pressDuration < btBackLongPressMs) {
+             // BACK corto: volver al menu anterior
+             currentScreen = MenuScreen::WaypointManager;
+             lastRenderedScreen = MenuScreen::Info;
+           } else if (pressDuration >= btBackLongPressMs) {
+            // BACK largo (3s): borrar waypoint seleccionado
+            if (waypointCount > 0 && selectedWaypointIndex >= 0) {
+              deleteWaypoint(selectedWaypointIndex);
+              lastRenderedScreen = MenuScreen::Info; // Force redraw
+            }
+             // BACK largo (3s): volver al menú anterior
+             currentScreen = MenuScreen::WaypointManager;
+             lastRenderedScreen = MenuScreen::Info;
+           }
+           btBackWasPressed = false;
+         }
+               }
+        break;
+      }
+      
+      case MenuScreen::Pairing: {
+        // Verificar solicitudes de emparejamiento cada cierto tiempo
+        if (now - lastPairingCheck >= PAIRING_CHECK_INTERVAL) {
+          checkPairingRequests();
+          lastPairingCheck = now;
+        }
+        
+        if (pairingRequestPending) {
+          // Si hay solicitud pendiente, manejar botones
+          if (readBtnOk()) {
+            // Aceptar emparejamiento
+            processLinkRequest();
+            pairingRequestPending = false;
+            pairingDeviceId = "";
+            lastRenderedScreen = MenuScreen::Info; // Force redraw
+          }
+          
+          if (readBtnBack()) {
+            // Rechazar emparejamiento
+            rejectPairing();
+            pairingRequestPending = false;
+            pairingDeviceId = "";
+            lastRenderedScreen = MenuScreen::Info; // Force redraw
+          }
+        } else {
+          // Sin solicitudes, solo permitir volver
+          if (readBtnBack()) {
+            currentScreen = MenuScreen::WiFiMenu;
+            lastRenderedScreen = MenuScreen::Info;
+          }
+        }
+        break;
+      }
   }
 
 render:
@@ -1264,9 +1515,13 @@ render:
             lastRenderedScreen = MenuScreen::WiFiConnecting;
             lastWifiConnected = true;
           }
-          if (!wifiPrefsReady) { wifiPrefs.begin("wifi", false); wifiPrefsReady = true; }
+          {
+            Preferences wifiPrefs;
+            wifiPrefs.begin("wifi", false);
           wifiPrefs.putString("ssid", selectedSSID);
           wifiPrefs.putString("pass", enteredPassword);
+            wifiPrefs.end();
+          }
         }
         else if (wifiConnTries > 30) { 
           wifiConnected = false; 
@@ -1281,10 +1536,11 @@ render:
       break;
          case MenuScreen::WiFiStatus: renderWiFiStatus(); break;
      case MenuScreen::LocalData: renderLocalData(); break;
-     case MenuScreen::Info: renderInfoScreen(); break;
+      case MenuScreen::Info: renderInfoScreen(); break;
      case MenuScreen::Tracking: renderTracking(); break;
-     case MenuScreen::WaypointManager: renderWaypointManager(); break;
-     case MenuScreen::Backtrack: renderBacktrack(); break;
+      case MenuScreen::WaypointManager: renderWaypointManager(); break;
+      case MenuScreen::Backtrack: renderBacktrack(); break;
+      case MenuScreen::Pairing: renderPairing(); break;
   }
 }
 
@@ -1390,19 +1646,19 @@ void updateLocalGPSPosition(float lat, float lon) {
     localPositionSet = true;
     lastLocalGPSUpdate = millis();
     
-          // Si tenemos datos del objetivo, recalcular navegación
-      if (hasTargetData && targetData.isValid) {
-        currentNavigation.distance = calculateDistance(localLatitude, localLongitude, targetData.latitude, targetData.longitude);
-        currentNavigation.bearing = calculateBearing(localLatitude, localLongitude, targetData.latitude, targetData.longitude);
-        currentNavigation.heading = currentNavigation.bearing;
-        currentNavigation.hasTarget = true;
-        currentNavigation.direction = getCardinalDirection(currentNavigation.bearing);
-        
-        Serial.printf("Local GPS Updated: %.6f, %.6f\n", localLatitude, localLongitude);
-        Serial.printf("Recalculated: Distance: %.1fm, Bearing: %.1f°, Direction: %s\n", 
-                      currentNavigation.distance, currentNavigation.bearing, 
-                      currentNavigation.direction.c_str());
-      }
+    // Si tenemos datos del objetivo, recalcular navegación
+    if (hasTargetData && targetData.isValid) {
+      currentNavigation.distance = calculateDistance(localLatitude, localLongitude, targetData.latitude, targetData.longitude);
+      currentNavigation.bearing = calculateBearing(localLatitude, localLongitude, targetData.latitude, targetData.longitude);
+      currentNavigation.heading = currentNavigation.bearing;
+      currentNavigation.hasTarget = true;
+      currentNavigation.direction = getCardinalDirection(currentNavigation.bearing);
+      
+      Serial.printf("Local GPS Updated: %.6f, %.6f\n", localLatitude, localLongitude);
+      Serial.printf("Recalculated: Distance: %.1fm, Bearing: %.1f°, Direction: %s\n", 
+                    currentNavigation.distance, currentNavigation.bearing, 
+                    currentNavigation.direction.c_str());
+    }
       
       // Si tenemos un waypoint seleccionado, recalcular navegación hacia él
       if (hasWaypointTarget && selectedWaypointIndex >= 0) {
@@ -1410,7 +1666,7 @@ void updateLocalGPSPosition(float lat, float lon) {
         Serial.printf("Waypoint Navigation Updated: Distance: %.1fm, Bearing: %.1f°, Direction: %s\n", 
                       waypointNavigation.distance, waypointNavigation.bearing, 
                       waypointNavigation.direction.c_str());
-      }
+    }
   }
 }
 
@@ -1423,15 +1679,13 @@ bool isLocalGPSAvailable() {
 
 // Inicializar preferencias para waypoints
 static void initWaypointPrefs() {
-  if (!waypointPrefsReady) {
-    waypointPrefs.begin("waypoints", false);
-    waypointPrefsReady = true;
-    loadWaypointsFromStorage();
-  }
+  loadWaypointsFromStorage();
 }
 
 // Cargar waypoints desde almacenamiento
 static void loadWaypointsFromStorage() {
+  Preferences waypointPrefs;
+  waypointPrefs.begin("waypoints", false);
   waypointCount = waypointPrefs.getInt("count", 0);
   if (waypointCount > MAX_WAYPOINTS) waypointCount = MAX_WAYPOINTS;
   
@@ -1443,12 +1697,13 @@ static void loadWaypointsFromStorage() {
     waypoints[i].timestamp = waypointPrefs.getULong((prefix + "time").c_str(), 0);
     waypoints[i].isValid = true;
   }
+  waypointPrefs.end();
 }
 
 // Guardar waypoints en almacenamiento
 static void saveWaypointsToStorage() {
-  if (!waypointPrefsReady) initWaypointPrefs();
-  
+  Preferences waypointPrefs;
+  waypointPrefs.begin("waypoints", false);
   waypointPrefs.putInt("count", waypointCount);
   for (int i = 0; i < waypointCount; i++) {
     String prefix = "wp" + String(i) + "_";
@@ -1457,6 +1712,7 @@ static void saveWaypointsToStorage() {
     waypointPrefs.putString((prefix + "name").c_str(), waypoints[i].name);
     waypointPrefs.putULong((prefix + "time").c_str(), waypoints[i].timestamp);
   }
+  waypointPrefs.end();
 }
 
 // Guardar posición actual como waypoint
@@ -1540,10 +1796,10 @@ void clearAllWaypoints() {
   waypointCount = 0;
   selectedWaypointIndex = -1;
   hasWaypointTarget = false;
-  
-  if (waypointPrefsReady) {
-    waypointPrefs.clear();
-  }
+  Preferences waypointPrefs;
+  waypointPrefs.begin("waypoints", false);
+  waypointPrefs.clear();
+  waypointPrefs.end();
 }
 
 // Actualizar navegación hacia waypoint cuando cambia la posición local
@@ -1674,4 +1930,68 @@ void updateLocalLoRaData(const SensorData& data) {
   lastLoRaReceived = millis();
 }
 
+// ===== FUNCIONES DE EMPAREJAMIENTO =====
 
+// Verificar solicitudes de emparejamiento pendientes
+void checkPairingRequests() {
+  // Solo verificar si WiFi está conectado
+  if (WiFi.status() != WL_CONNECTED) {
+    pairingRequestPending = false;
+    pairingDeviceId = "";
+    return;
+  }
+  
+  // Usar la función real de Firebase para verificar solicitudes
+  if (checkForLinkRequest()) {
+    // Si hay una solicitud pendiente, obtener el ID del dispositivo
+    // Por ahora usamos un ID genérico, pero se puede mejorar para obtener el real
+    pairingRequestPending = true;
+    pairingDeviceId = "Dispositivo solicitante"; // TODO: Obtener ID real desde Firebase
+  } else {
+    pairingRequestPending = false;
+    pairingDeviceId = "";
+  }
+}
+
+// Aceptar emparejamiento
+void acceptPairing() {
+  Serial.println("Aceptando emparejamiento con: " + pairingDeviceId);
+  
+  // Usar la función real de Firebase para aceptar el emparejamiento
+  if (acceptLinkRequest()) {
+    Serial.println("Emparejamiento aceptado exitosamente");
+    // Limpiar el estado local
+    pairingRequestPending = false;
+    pairingDeviceId = "";
+  } else {
+    Serial.println("Error al aceptar el emparejamiento");
+  }
+}
+
+// Rechazar emparejamiento
+void rejectPairing() {
+  Serial.println("Rechazando emparejamiento con: " + pairingDeviceId);
+  
+  // Usar la función real de Firebase para rechazar el emparejamiento
+  if (deleteLinkRequest()) {
+    Serial.println("Emparejamiento rechazado exitosamente");
+    // Limpiar el estado local
+    pairingRequestPending = false;
+    pairingDeviceId = "";
+  } else {
+    Serial.println("Error al rechazar el emparejamiento");
+  }
+}
+
+// Función para establecer solicitud de emparejamiento (llamada desde Firebase)
+void setPairingRequest(const String& deviceId) {
+  pairingRequestPending = true;
+  pairingDeviceId = deviceId;
+  lastPairingCheck = millis();
+}
+
+// Función para limpiar solicitud de emparejamiento
+void clearPairingRequest() {
+  pairingRequestPending = false;
+  pairingDeviceId = "";
+}

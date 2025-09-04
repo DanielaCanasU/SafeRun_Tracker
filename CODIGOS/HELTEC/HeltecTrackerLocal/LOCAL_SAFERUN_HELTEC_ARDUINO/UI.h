@@ -29,5 +29,12 @@ int getWaypointCount();
 String getWaypointName(int index);
 void clearAllWaypoints();
 
+// Funciones del sistema de emparejamiento
+void checkPairingRequests();
+void acceptPairing();
+void rejectPairing();
+void setPairingRequest(const String& deviceId);
+void clearPairingRequest();
+
 
 

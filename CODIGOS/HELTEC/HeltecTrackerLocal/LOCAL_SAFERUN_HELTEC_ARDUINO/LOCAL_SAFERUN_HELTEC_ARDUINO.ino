@@ -64,7 +64,15 @@ void setup() {
     // Initialize Firebase handler (objects only; do not connect yet)
     if (!initFirebaseHandler()) {
         Serial.println("Failed to initialize Firebase handler");
-        while (1) { delay(1000); yield(); }
+        // Intentar limpiar memoria y reintentar
+        forceGarbageCollection();
+        delay(1000);
+        yield();
+        
+        if (!initFirebaseHandler()) {
+            Serial.println("Failed to initialize Firebase handler after retry");
+            while (1) { delay(1000); yield(); }
+        }
     }
     yield();
     
@@ -133,13 +141,32 @@ void loop() {
     // Start Firebase only when in remote mode and WiFi is connected via menu
     static bool firebaseStarted = false;
     static bool timeSynced = false;
+    static unsigned long lastFirebaseAttempt = 0;
+    static int firebaseAttempts = 0;
+    
     if (!firebaseStarted && isRemoteModeSelected() && WiFi.status() == WL_CONNECTED) {
-        // Verificar memoria antes de iniciar Firebase
-        if (!isMemoryLow()) {
-            firebaseStarted = startFirebase();
-        } else {
-            Serial.println("Memoria baja - posponiendo inicio de Firebase");
-            forceGarbageCollection();
+        // Esperar al menos 5 segundos entre intentos de Firebase
+        if (now - lastFirebaseAttempt >= 5000) {
+            lastFirebaseAttempt = now;
+            firebaseAttempts++;
+            
+            // Verificar memoria antes de iniciar Firebase
+            if (!isMemoryLow()) {
+                Serial.printf("Intento %d de iniciar Firebase...\n", firebaseAttempts);
+                // Antes de llamar a startFirebase o Firebase.begin, asegurarse de que no hay Preferences abiertos
+                // (Ya que ahora todos los Preferences se abren/cierra localmente, esto se cumple)
+                firebaseStarted = startFirebase();
+                
+                if (!firebaseStarted && firebaseAttempts >= 3) {
+                    Serial.println("Demasiados intentos fallidos de Firebase - deshabilitando");
+                    // Deshabilitar Firebase para esta sesión
+                    firebaseStarted = true; // Evitar más intentos
+                }
+            } else {
+                Serial.println("Memoria baja - posponiendo inicio de Firebase");
+                forceGarbageCollection();
+                delay(1000);
+            }
         }
     }
     
@@ -188,6 +215,7 @@ void loop() {
             }
             lastSensor4 = currentData.sensor4;
         }
+        Serial.println("Debug");
     }
     
     // In local mode, optionally draw quick status onto display
