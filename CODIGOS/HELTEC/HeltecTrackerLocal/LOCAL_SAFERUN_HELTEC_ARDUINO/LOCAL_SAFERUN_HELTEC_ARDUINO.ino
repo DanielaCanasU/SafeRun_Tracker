@@ -93,7 +93,7 @@ void loop() {
     static int lastSensor4 = 0;
     
     // Monitoreo de estabilidad del sistema
-    checkSystemStability();
+    //checkSystemStability();
     
     // Check for pending link requests periodically
     if (OPEN_TO_PAIR) {

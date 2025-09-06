@@ -20,7 +20,7 @@ static void renderInfoScreen();
 #define ST7735_GRAY ST7735_COLOR565(128, 128, 128)
 
 // Menu state (mirrors ESP32 OLEDMenu)
-enum class MenuScreen { Welcome, SelectMode, WiFiMenu, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing };
+enum class MenuScreen { Welcome, SelectMode, MenuPrincipal, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing };
 static MenuScreen currentScreen = MenuScreen::Welcome;
 static bool wifiConnected = false;
 
@@ -45,7 +45,7 @@ static int selectedNetworkIdx = 0;
 static String selectedSSID = "";
 static String enteredPassword = "";
 static bool wifiScanStarted = false;
-static int wifiMenuIdx = 0; // 0 = Escanear redes, 1 = Estado
+static int MenuPrincipalIdx = 0; // 0 = Escanear redes, 1 = Estado
 static bool wifiConnectingActive = false;
 static unsigned long wifiConnLastCheckMs = 0;
 static int wifiConnTries = 0;
@@ -57,7 +57,7 @@ static int charIndex = 0;
 // Cache for optimized rendering
 static MenuScreen lastRenderedScreen = MenuScreen::Info;
 static bool lastRemoteMode = false;
-static int lastWifiMenuIdx = -1;
+static int lastMenuPrincipalIdx = -1;
 static String lastWifiStatus = "";
 static int lastSelectedNetworkIdx = -1;
 static String lastEnteredPassword = "";
@@ -141,6 +141,24 @@ static void drawCircle(int x, int y, int radius, uint16_t color) {
       }
     }
   }
+}
+
+// Función para dibujar el contorno de un círculo (algoritmo de punto medio)
+static void drawCircleOutline(int xc, int yc, int r, uint16_t color) {
+    int x = r, y = 0;
+    int P = 1 - r;
+    while (x > y) {
+        y++;
+        if (P <= 0) P = P + 2*y + 1;
+        else { x--; P = P + 2*y - 2*x + 1; }
+        if (x < y) break;
+        st7735.st7735_draw_pixel(xc + x, yc + y, color); st7735.st7735_draw_pixel(xc - x, yc + y, color);
+        st7735.st7735_draw_pixel(xc + x, yc - y, color); st7735.st7735_draw_pixel(xc - x, yc - y, color);
+        if (x != y) {
+            st7735.st7735_draw_pixel(xc + y, yc + x, color); st7735.st7735_draw_pixel(xc - y, yc + x, color);
+            st7735.st7735_draw_pixel(xc + y, yc - x, color); st7735.st7735_draw_pixel(xc - y, yc - x, color);
+        }
+    }
 }
 
 static void drawLine(int x1, int y1, int x2, int y2, uint16_t color) {
@@ -434,30 +452,27 @@ static void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bg
        drawLine(x + 7, y + 12, x + 11, y + 12, fg);
      } break;
      case 4: { // Rastreo: brújula/radar icon más visible
-       // Círculo exterior más grueso
-       drawCircle(x + 9, y + 9, 7, fg);
-       drawCircle(x + 9, y + 9, 6, fg);
-       // Flecha central más gruesa apuntando hacia arriba
-       drawLine(x + 8, y + 2, x + 8, y + 16, fg);
-       drawLine(x + 9, y + 2, x + 9, y + 16, fg);
-       drawLine(x + 10, y + 2, x + 10, y + 16, fg);
-       // Puntas de la flecha más grandes
-       drawLine(x + 8, y + 2, x + 5, y + 6, fg);
-       drawLine(x + 10, y + 2, x + 13, y + 6, fg);
-       // Marcas cardinales más visibles
-       drawLine(x + 9, y + 1, x + 9, y + 4, fg); // Norte
-       drawLine(x + 9, y + 14, x + 9, y + 17, fg); // Sur
-       drawLine(x + 1, y + 9, x + 4, y + 9, fg); // Oeste
-       drawLine(x + 14, y + 9, x + 17, y + 9, fg); // Este
+      // Icono de retículo/mira para Rastreo
+      int centerX = x + 9;
+      int centerY = y + 11;
+      int radius = 6;
+
+      // Dibujar círculo (contorno)
+      drawCircleOutline(centerX, centerY, radius, fg);
+
+      // Línea vertical
+      drawLine(centerX, y + 2, centerX, y + 20, fg);
+      // Línea horizontal
+      drawLine(x, centerY, x + 18, centerY, fg);
      } break;
      case 5: { // Backtrack: flecha de retorno simple y clara
        // Flecha de retorno simple (forma de L invertida)
-       drawLine(x + 12, y + 2, x + 12, y + 16, fg); // Línea vertical
-       drawLine(x + 12, y + 16, x + 4, y + 16, fg); // Línea horizontal izquierda
+       drawLine(x + 4, y + 2, x + 4, y + 16, fg); // Línea vertical
+       drawLine(x + 4, y + 16, x - 4, y + 16, fg); // Línea horizontal izquierda
        // Punta de la flecha apuntando hacia la izquierda
-       drawLine(x + 4, y + 16, x + 7, y + 13, fg);
-       drawLine(x + 4, y + 16, x + 7, y + 16, fg);
-       drawLine(x + 7, y + 13, x + 7, y + 16, fg);
+       drawLine(x - 4, y + 16, x - 1, y + 13, fg);
+       drawLine(x - 4, y + 16, x - 1, y + 16, fg);
+       drawLine(x - 1, y + 13, x - 1, y + 16, fg);
      } break;
      case 6: { // Info: círculo con i
       drawCircle(x + 9, y + 9, 7, fg);
@@ -480,7 +495,7 @@ static void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bg
 
 static void renderMainMenu() {
   // Only redraw when the selected index or screen changes to avoid flicker
-  if (lastRenderedScreen != MenuScreen::WiFiMenu || lastMainMenuIdx != mainMenuIdx) {
+  if (lastRenderedScreen != MenuScreen::MenuPrincipal || lastMainMenuIdx != mainMenuIdx) {
     drawHeaderWithWiFi("Inicio");
 
     // Clear menu area (keep header)
@@ -492,7 +507,7 @@ static void renderMainMenu() {
     // Draw option above (if exists)
     if (mainMenuIdx > 0) {
       int aboveIdx = mainMenuIdx - 1;
-      String aboveText = String("^ ") + String(menuItems[aboveIdx]);
+      String aboveText = String(menuItems[aboveIdx]);
       // Calculate centered positions
       int iconX = 35; // Center of screen (128/2 - 18/2 = 55)
       int textX = 55; // Icon center + icon width/2 + spacing
@@ -511,6 +526,7 @@ static void renderMainMenu() {
      // Ajustar posición del texto "Backtrack" para centrarlo visualmente
      if (mainMenuIdx == 5) { // Backtrack
        selectedTextX = 35; // Comenzar antes para centrar visualmente
+       selectedIconX = 25;
      }
      
     // Icon for selected (on white bg) - centered
@@ -520,7 +536,7 @@ static void renderMainMenu() {
     // Draw option below (if exists)
       if (mainMenuIdx < 6) { // Cambiado de 5 a 6 para mostrar la opción de abajo
       int belowIdx = mainMenuIdx + 1;
-      String belowText = String("v ") + String(menuItems[belowIdx]);
+      String belowText =  String(menuItems[belowIdx]);
       // Calculate centered positions
       int belowIconX = 35; // Center of screen
       int belowTextX = 55; // Icon center + icon width/2 + spacing
@@ -539,7 +555,7 @@ static void renderMainMenu() {
       st7735.st7735_write_str(belowTextX, 65, belowText.c_str(), Font_7x10, ST7735_GRAY, ST7735_BLACK);
     }
 
-    lastRenderedScreen = MenuScreen::WiFiMenu;
+    lastRenderedScreen = MenuScreen::MenuPrincipal;
     lastMainMenuIdx = mainMenuIdx;
   }
 }
@@ -579,25 +595,27 @@ static void renderMode() {
       fillRectPixels(x, yLocal, boxW, boxH, ST7735_BLACK);
       st7735.st7735_write_str(x + 64, yLocal + 6, "Local", Font_7x10, ST7735_GRAY, ST7735_BLACK);
     }
+    lastRemoteMode = remoteMode; // También actualizar el cache
+
   }
 
   //drawFooter("OK: cambiar | OK3s menú");
 }
 
-static void renderWiFiMenu() {
+static void renderMenuPrincipal() {
   String currentWifiStatus = String(WiFi.status() == WL_CONNECTED ? "Conectado" : "No conectado");
   
   // Only redraw if screen changed or menu index changed or wifi status changed
-  if (lastRenderedScreen != MenuScreen::WiFiMenu || lastWifiMenuIdx != wifiMenuIdx || lastWifiStatus != currentWifiStatus) {
+  if (lastRenderedScreen != MenuScreen::MenuPrincipal || lastMenuPrincipalIdx != MenuPrincipalIdx || lastWifiStatus != currentWifiStatus) {
     drawHeaderWithWiFi("WiFi");
-    lastRenderedScreen = MenuScreen::WiFiMenu;
-    lastWifiMenuIdx = wifiMenuIdx;
+    lastRenderedScreen = MenuScreen::MenuPrincipal;
+    lastMenuPrincipalIdx = MenuPrincipalIdx;
     lastWifiStatus = currentWifiStatus;
   }
   
   // Update only the changing parts
-  st7735.st7735_write_str(0, 20, (wifiMenuIdx == 0 ? "> " : "  ") + String("Escanear redes"), Font_7x10, wifiMenuIdx == 0 ? MORADO : ST7735_WHITE);
-  st7735.st7735_write_str(0, 32, (wifiMenuIdx == 1 ? "> " : "  ") + String("Estado: ") + currentWifiStatus, Font_7x10, wifiMenuIdx == 1 ? MORADO : ST7735_WHITE);
+  st7735.st7735_write_str(0, 20, (MenuPrincipalIdx == 0 ? "> " : "  ") + String("Escanear redes"), Font_7x10, MenuPrincipalIdx == 0 ? MORADO : ST7735_WHITE);
+  st7735.st7735_write_str(0, 32, (MenuPrincipalIdx == 1 ? "> " : "  ") + String("Estado: ") + currentWifiStatus, Font_7x10, MenuPrincipalIdx == 1 ? MORADO : ST7735_WHITE);
   drawFooter2("Arr/Abj mover | OK entrar", "OK3s menu");
 }
 
@@ -991,7 +1009,7 @@ void renderWelcomeScreen() {
   // Esperar un tiempo antes de pasar al menú principal
   if (elapsed > WELCOME_DURATION) {
     welcomeScreenShown = true;
-  currentScreen = MenuScreen::WiFiMenu;
+  currentScreen = MenuScreen::MenuPrincipal;
     lastRenderedScreen = MenuScreen::Welcome;
   renderMainMenu();
   }
@@ -1013,7 +1031,7 @@ void updateUI(unsigned long now) {
     // Permitir saltar la pantalla de bienvenida con cualquier botón
     if (readBtnOk() || readBtnUp() || readBtnDown() || readBtnBack()) {
       welcomeScreenShown = true;
-      currentScreen = MenuScreen::WiFiMenu;
+      currentScreen = MenuScreen::MenuPrincipal;
       renderMainMenu();
       return;
     }
@@ -1039,7 +1057,7 @@ void updateUI(unsigned long now) {
 
   // Handle button input
   switch (currentScreen) {
-    case MenuScreen::WiFiMenu: {
+    case MenuScreen::MenuPrincipal: {
              // Main menu navigation
                  if (readBtnUp())   mainMenuIdx = (mainMenuIdx - 1 + 7) % 7;
          if (readBtnDown()) mainMenuIdx = (mainMenuIdx + 1) % 7;
@@ -1082,7 +1100,6 @@ void updateUI(unsigned long now) {
     case MenuScreen::SelectMode: {
       if (readBtnUp() || readBtnDown()) {
         setRemoteMode(!isRemoteModeSelected());
-         lastRemoteMode = !lastRemoteMode; // También actualizar el cache
       }
       
       // Check for long press (3 seconds) to go back to main menu
@@ -1095,7 +1112,7 @@ void updateUI(unsigned long now) {
           okDownMs = now;
           okWasPressed = true;
         } else if (now - okDownMs >= longPressMs) {
-          currentScreen = MenuScreen::WiFiMenu; // Back to main menu
+          currentScreen = MenuScreen::MenuPrincipal; // Back to main menu
           okWasPressed = false;
         }
       } else {
@@ -1105,15 +1122,15 @@ void updateUI(unsigned long now) {
        
        // BACK corto: volver al menú principal
        if (readBtnBack()) {
-         currentScreen = MenuScreen::WiFiMenu;
+         currentScreen = MenuScreen::MenuPrincipal;
          lastRenderedScreen = MenuScreen::Info;
       }
     } break;
     
     case MenuScreen::WiFiSubMenu: {
       // WiFi submenu (when coming from main menu)
-      if (readBtnUp())   wifiMenuIdx = (wifiMenuIdx - 1 + 2) % 2;
-      if (readBtnDown()) wifiMenuIdx = (wifiMenuIdx + 1) % 2;
+      if (readBtnUp())   MenuPrincipalIdx = (MenuPrincipalIdx - 1 + 2) % 2;
+      if (readBtnDown()) MenuPrincipalIdx = (MenuPrincipalIdx + 1) % 2;
       
       // Check for short press to enter submenu
       static bool okWasPressed = false;
@@ -1127,7 +1144,7 @@ void updateUI(unsigned long now) {
           okWasPressed = true;
         } else if (now - okDownMs >= longPressMs) {
           // Long press: go back to main menu
-          currentScreen = MenuScreen::WiFiMenu; // Back to main menu
+          currentScreen = MenuScreen::MenuPrincipal; // Back to main menu
           okWasPressed = false;
         }
       } else {
@@ -1136,7 +1153,7 @@ void updateUI(unsigned long now) {
           unsigned long pressDuration = now - okDownMs;
           if (pressDuration >= 50 && pressDuration < shortPressMs) {
             // Short press: enter selected submenu
-            if (wifiMenuIdx == 0) currentScreen = MenuScreen::WiFiScan;
+            if (MenuPrincipalIdx == 0) currentScreen = MenuScreen::WiFiScan;
             else currentScreen = MenuScreen::WiFiStatus;
           }
         }
@@ -1145,7 +1162,7 @@ void updateUI(unsigned long now) {
        
        // BACK corto: volver al menú principal
        if (readBtnBack()) {
-         currentScreen = MenuScreen::WiFiMenu;
+         currentScreen = MenuScreen::MenuPrincipal;
          lastRenderedScreen = MenuScreen::Info;
       }
     } break;
@@ -1281,13 +1298,16 @@ void updateUI(unsigned long now) {
           infoOkDownMs = now;
           infoOkWasPressed = true;
         } else if (now - infoOkDownMs >= infoLongPressMs) {
-          currentScreen = MenuScreen::WiFiMenu; // Back to main menu
-          lastRenderedScreen = MenuScreen::Info; // Force redraw
+
           infoOkWasPressed = false;
         }
       } else {
         infoOkWasPressed = false;
       }
+      if (readBtnBack()) {
+        currentScreen = MenuScreen::MenuPrincipal;
+        lastRenderedScreen = MenuScreen::Info;
+     }
       break;
       
     case MenuScreen::WaypointManager: {
@@ -1382,7 +1402,7 @@ void updateUI(unsigned long now) {
            unsigned long pressDuration = now - wpBackDownMs;
            if (pressDuration >= 50 && pressDuration < wpBackLongPressMs) {
             // BACK largo (3s): volver al menú principal
-            currentScreen = MenuScreen::WiFiMenu;
+            currentScreen = MenuScreen::MenuPrincipal;
             lastRenderedScreen = MenuScreen::Info;
             wpBackWasPressed = false;
            }
@@ -1405,7 +1425,7 @@ void updateUI(unsigned long now) {
            btOkDownMs = now;
            btOkWasPressed = true;
          } else if (now - btOkDownMs >= btLongPressMs) {
-           currentScreen = MenuScreen::WiFiMenu;
+           currentScreen = MenuScreen::MenuPrincipal;
            lastRenderedScreen = MenuScreen::Info;
            btOkWasPressed = false;
          }
@@ -1474,7 +1494,7 @@ void updateUI(unsigned long now) {
         } else {
           // Sin solicitudes, solo permitir volver
           if (readBtnBack()) {
-            currentScreen = MenuScreen::WiFiMenu;
+            currentScreen = MenuScreen::MenuPrincipal;
             lastRenderedScreen = MenuScreen::Info;
           }
         }
@@ -1485,12 +1505,12 @@ void updateUI(unsigned long now) {
 render:
   // Render
   switch (currentScreen) {
-    case MenuScreen::WiFiMenu: 
-      // Always render main menu when in WiFiMenu state
+    case MenuScreen::MenuPrincipal: 
+      // Always render main menu when in MenuPrincipal state
       renderMainMenu();
       break;
     case MenuScreen::SelectMode: renderMode(); break;
-    case MenuScreen::WiFiSubMenu: renderWiFiMenu(); break;
+    case MenuScreen::WiFiSubMenu: renderMenuPrincipal(); break;
     case MenuScreen::WiFiScan:
       if (!wifiScanStarted) { 
         WiFi.mode(WIFI_STA); 
