@@ -48,41 +48,46 @@ void setup() {
     Serial.printf("Memoria libre al inicio: %d bytes\n", ESP.getFreeHeap());
     
     // Alimentar el watchdog durante la inicialización
-    yield();
+    //yield();
     
     // Initialize sensor data structure
     initSensorData(currentData);
-    yield();
+    //yield();
     
     // Initialize LoRa handler
     if (!initLoRaHandler()) {
         Serial.println("Failed to initialize LoRa handler");
-        while (1) { delay(1000); yield(); }
+        while (1) { delay(1000); //yield(); 
+        }
     }
-    yield();
+    else {
+        Serial.println("LoRa handler initialized successfully");
+    }
+        //yield();
     
     // Initialize Firebase handler (objects only; do not connect yet)
     if (!initFirebaseHandler()) {
         Serial.println("Failed to initialize Firebase handler");
         // Intentar limpiar memoria y reintentar
-        forceGarbageCollection();
+        //forceGarbageCollection();
         delay(1000);
-        yield();
+        //yield();
         
         if (!initFirebaseHandler()) {
             Serial.println("Failed to initialize Firebase handler after retry");
-            while (1) { delay(1000); yield(); }
+            while (1) { delay(1000); //yield();
+            }
         }
     }
-    yield();
+    //yield();
     
     // Initialize UI
     initUI();
-    yield();
+    //yield();
     
     // Initialize GPS
     configureGPS();
-    yield();
+    //yield();
     
     Serial.println("All systems initialized successfully");
     Serial.println("Device ready for operation");
