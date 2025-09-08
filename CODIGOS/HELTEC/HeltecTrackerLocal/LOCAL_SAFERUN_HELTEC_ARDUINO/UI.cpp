@@ -511,6 +511,33 @@ static void renderMainMenu() {
       // Calculate centered positions
       int iconX = 35; // Center of screen (128/2 - 18/2 = 55)
       int textX = 55; // Icon center + icon width/2 + spacing
+      switch (aboveIdx) {
+        case 0:
+          textX = 75;
+          iconX = 50;
+          break;
+        case 1:
+          textX = 75;
+          iconX = 55;
+          break;
+        case 2:
+          textX = 65;
+          iconX = 45;
+          break;
+        case 3:
+          textX = 73;
+          iconX = 53;
+          break;
+        case 4:
+          textX = 63;
+          iconX = 43;
+          break;
+        case 5:
+          textX = 55;
+          iconX = 45;
+          break;
+      }
+
       // Icon for above (on black bg) - centered
       drawMenuIcon(iconX, 15, aboveIdx, false, ST7735_BLACK);
       st7735.st7735_write_str(textX, 20, aboveText.c_str(), Font_7x10, ST7735_GRAY, ST7735_BLACK);
@@ -522,12 +549,38 @@ static void renderMainMenu() {
     // Calculate centered positions for selected item
     int selectedIconX = 35; // Center of screen
     int selectedTextX = 55; // Icon center + icon width/2 + spacing
+    switch (mainMenuIdx) {
+      case 0:
+        selectedTextX = 65;
+        selectedIconX = 45;
+        break;
+      case 1:
+        selectedTextX = 65;
+        selectedIconX = 45;
+        break;
+      case 2:
+        selectedTextX = 55;
+        selectedIconX = 35;
+        break;
+      case 3:
+        selectedTextX = 60;
+        selectedIconX = 40;
+        break;
+      case 4:
+        selectedTextX = 52;
+        selectedIconX = 32;
+        break;
+      case 5:
+        selectedTextX = 40;
+        selectedIconX = 25;
+        break;
+      case 6:
+        selectedTextX = 40;
+        selectedIconX = 25;
+        break;
+    }
      
-     // Ajustar posición del texto "Backtrack" para centrarlo visualmente
-     if (mainMenuIdx == 5) { // Backtrack
-       selectedTextX = 35; // Comenzar antes para centrar visualmente
-       selectedIconX = 25;
-     }
+
      
     // Icon for selected (on white bg) - centered
     drawMenuIcon(selectedIconX, 34, mainMenuIdx, true, ST7735_WHITE);
@@ -540,15 +593,38 @@ static void renderMainMenu() {
       // Calculate centered positions
       int belowIconX = 35; // Center of screen
       int belowTextX = 55; // Icon center + icon width/2 + spacing
+      switch (belowIdx) {
+        case 0:
+          belowTextX = 65;
+          belowIconX = 45;
+          break;
+        case 1:
+          belowTextX = 70;
+          belowIconX = 50;
+          break;
+        case 2: 
+          belowTextX = 64;
+          belowIconX = 44;
+          break;
+        case 3: 
+          belowTextX = 70;
+          belowIconX = 50;
+          break;
+        case 4: 
+          belowTextX = 64;
+          belowIconX = 42;
+          break;
+        case 5:
+          belowTextX = 58;
+          belowIconX = 48;
+          break;
+        case 6:
+          belowTextX = 55;
+          belowIconX = 35;
+          break;
+      }
        
-               // Ajustar posición del texto "Backtrack" si está abajo
-        if (belowIdx == 5) { // Backtrack
-          belowTextX = 45; // Comenzar antes para centrar visualmente
-        }
-        // Ajustar posición del texto "Emparejar" si está abajo
-        if (belowIdx == 6) { // Emparejar
-          belowTextX = 40; // Comenzar antes para centrar visualmente
-        }
+
        
       // Icon for below (on black bg) - centered
       drawMenuIcon(belowIconX, 61, belowIdx, false, ST7735_BLACK);
