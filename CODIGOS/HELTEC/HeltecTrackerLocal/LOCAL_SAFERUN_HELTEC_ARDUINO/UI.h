@@ -1,40 +1,13 @@
 #pragma once
 #include <Arduino.h>
-#include "SensorData.h"
-#include "TrackingData.h"
+#include "SensorData.h" // Necesario para el tipo SensorData
 
+// Funciones principales de la UI
 void initUI();
 void updateUI(unsigned long now);
-void renderInfoLoRa(const SensorData &data);
 
-// Funciones de la pantalla de bienvenida
-void renderWelcomeScreen();
-void renderBlinkingEyes();
-void renderWelcomeMessage();
-bool isWelcomeScreenComplete();
-
-// Funciones del sistema de rastreo
-void updateTrackingData(const SensorData &data);
-bool getTrackingData(TrackingData &data);
-bool getNavigationData(NavigationData &nav);
+// Funciones para actualizar el estado de la UI desde otros módulos
+void updateLocalLoRaData(const SensorData& data);
+void updateTrackingData(const SensorData& data);
 void updateLocalGPSPosition(float lat, float lon);
-bool isLocalGPSAvailable();
-
-// Funciones del sistema de backtrack
-void saveCurrentPositionAsWaypoint(const String& name);
-void deleteWaypoint(int index);
-void selectWaypoint(int index);
-bool getSelectedWaypoint(float& lat, float& lon, String& name);
-int getWaypointCount();
-String getWaypointName(int index);
-void clearAllWaypoints();
-
-// Funciones del sistema de emparejamiento
-void checkPairingRequests();
-void acceptPairing();
-void rejectPairing();
-void setPairingRequest(const String& deviceId);
-void clearPairingRequest();
-
-
-
+void renderInfoLoRa(const SensorData &data);

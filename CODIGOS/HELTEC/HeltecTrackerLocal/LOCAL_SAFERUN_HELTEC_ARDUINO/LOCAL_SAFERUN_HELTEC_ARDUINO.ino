@@ -222,7 +222,7 @@ void loop() {
         }
         Serial.println("Debug");
     }
-    
+        
     // In local mode, optionally draw quick status onto display
     if (!isRemoteModeSelected()) {
         renderInfoLoRa(currentData);

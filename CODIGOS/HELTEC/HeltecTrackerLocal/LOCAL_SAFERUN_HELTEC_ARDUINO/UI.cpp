@@ -81,6 +81,7 @@ static int lastMainMenuIdx = -1;
 static bool pairingRequestPending = false;
 static String pairingDeviceId = "";
 static unsigned long lastPairingCheck = 0;
+static bool datosRecibidos = false; // Flag para indicar nuevos datos LoRa
 static const unsigned long PAIRING_CHECK_INTERVAL = 5000; // 5 segundos
 
 // Tracking system variables
@@ -131,6 +132,16 @@ static void initWaypointPrefs();
 static void loadWaypointsFromStorage();
 static void saveWaypointsToStorage();
 static void updateWaypointNavigation();
+
+// ===== FORWARD DECLARATIONS FOR UI FUNCTIONS =====
+void renderWelcomeScreen();
+bool isLocalGPSAvailable();
+void saveCurrentPositionAsWaypoint(const String& name);
+void deleteWaypoint(int index);
+void selectWaypoint(int index);
+void checkPairingRequests();
+void rejectPairing();
+void acceptPairing();
 
 // Drawing helper functions
 static void drawCircle(int x, int y, int radius, uint16_t color) {
@@ -494,17 +505,34 @@ static void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bg
 }
 
 static void renderMainMenu() {
-  // Only redraw when the selected index or screen changes to avoid flicker
-  if (lastRenderedScreen != MenuScreen::MenuPrincipal || lastMainMenuIdx != mainMenuIdx) {
+  // Si es la primera vez que entramos a esta pantalla, dibujar el fondo estático
+  if (lastRenderedScreen != MenuScreen::MenuPrincipal) {
+    st7735.st7735_fill_rectangle(0, 20, 128, 70, ST7735_BLACK);
+
     drawHeaderWithWiFi("Inicio");
+    // Dibujar la barra blanca de selección UNA SOLA VEZ
+    fillRectPixels(0, 34, 160, 26, ST7735_WHITE);
+    lastRenderedScreen = MenuScreen::MenuPrincipal;
+    lastMainMenuIdx = -1; // Forzar un redibujado completo de los items del menú
+  }
 
-    // Clear menu area (keep header)
-    st7735.st7735_fill_rectangle(0, 10, 128, 70, ST7735_BLACK);
+  // Si el índice del menú ha cambiado, redibujar solo los items
+  if (lastMainMenuIdx != mainMenuIdx) {
+    // --- Limpieza selectiva ---
+    // 1. Limpiar el área de texto superior (encima de la barra blanca)
+    st7735.st7735_fill_rectangle(0, 15, 160, 19, ST7735_BLACK);
 
-    // Menu options
-     const char* menuItems[] = {"Modo", "WiFi", "Remoto", "Local", "Rastreo", "Backtrack", "Emparejar"};
+    // 2. Limpiar el área de texto inferior (debajo de la barra blanca)
+    st7735.st7735_fill_rectangle(0, 60, 160, 20, ST7735_BLACK);
 
-    // Draw option above (if exists)
+    // 3. Limpiar el contenido anterior de la barra blanca (sin redibujar toda la barra).
+    //    Esto es necesario para borrar el texto e icono antiguos antes de dibujar los nuevos.
+    fillRectPixels(20, 34, 120, 26, ST7735_WHITE); // Limpia el centro de la barra blanca
+
+    // --- Redibujado de items ---
+    const char* menuItems[] = {"Modo", "WiFi", "Remoto", "Local", "Rastreo", "Backtrack", "Emparejar"};
+
+    // Dibujar opción de arriba (si existe)
     if (mainMenuIdx > 0) {
       int aboveIdx = mainMenuIdx - 1;
       String aboveText = String(menuItems[aboveIdx]);
@@ -543,9 +571,8 @@ static void renderMainMenu() {
       st7735.st7735_write_str(textX, 20, aboveText.c_str(), Font_7x10, ST7735_GRAY, ST7735_BLACK);
     }
 
-    // Draw selected option (highlight full width)
-    String selectedText = String(menuItems[mainMenuIdx]);
-    fillRectPixels(0, 34, 160, 26, ST7735_WHITE);
+    // Dibujar opción seleccionada (sobre la barra blanca ya existente)
+    String selectedText = String(menuItems[mainMenuIdx]);    
     // Calculate centered positions for selected item
     int selectedIconX = 35; // Center of screen
     int selectedTextX = 55; // Icon center + icon width/2 + spacing
@@ -586,7 +613,7 @@ static void renderMainMenu() {
     drawMenuIcon(selectedIconX, 34, mainMenuIdx, true, ST7735_WHITE);
     write_str_bold(selectedTextX, 38, selectedText.c_str(), Font_11x18, ST7735_BLACK, ST7735_WHITE);
 
-    // Draw option below (if exists)
+    // Dibujar opción de abajo (si existe)
       if (mainMenuIdx < 6) { // Cambiado de 5 a 6 para mostrar la opción de abajo
       int belowIdx = mainMenuIdx + 1;
       String belowText =  String(menuItems[belowIdx]);
@@ -631,7 +658,6 @@ static void renderMainMenu() {
       st7735.st7735_write_str(belowTextX, 65, belowText.c_str(), Font_7x10, ST7735_GRAY, ST7735_BLACK);
     }
 
-    lastRenderedScreen = MenuScreen::MenuPrincipal;
     lastMainMenuIdx = mainMenuIdx;
   }
 }
@@ -788,9 +814,12 @@ static void renderLocalData() {
   // Solo redibujar si cambia la pantalla o los datos
   static SensorData prevData = {};
   static unsigned long prevReceived = 0;
+  
   bool changed = (lastRenderedScreen != MenuScreen::LocalData ||
                   memcmp(&prevData, &lastLoRaData, sizeof(SensorData)) != 0 ||
-                  prevReceived != lastLoRaReceived);
+                  prevReceived != lastLoRaReceived || datosRecibidos );
+  
+  
   if (changed) {
     st7735.st7735_fill_screen(ST7735_BLACK);
     drawHeaderWithWiFi("Datos Remoto");
@@ -809,6 +838,10 @@ static void renderLocalData() {
     st7735.st7735_write_str(0, 52, buf, Font_7x10, ST7735_WHITE);
     snprintf(buf, sizeof(buf), "Recibido: %lus", lastLoRaReceived / 1000);
     st7735.st7735_write_str(0, 64, buf, Font_7x10, ST7735_GRAY);
+
+    if (datosRecibidos) { 
+      datosRecibidos = false;
+    }
   }
 }
 
@@ -2030,6 +2063,7 @@ static void renderInfoScreen() {
 void updateLocalLoRaData(const SensorData& data) {
   lastLoRaData = data;
   lastLoRaReceived = millis();
+  datosRecibidos = true;
 }
 
 // ===== FUNCIONES DE EMPAREJAMIENTO =====

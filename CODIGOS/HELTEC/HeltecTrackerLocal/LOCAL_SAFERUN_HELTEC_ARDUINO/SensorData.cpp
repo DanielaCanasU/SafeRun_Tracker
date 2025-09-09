@@ -11,53 +11,57 @@ void initSensorData(SensorData &data) {
   data.accelX = data.accelY = data.accelZ = 0.0f;
 }
 
-void parseLoRaMessage(String message, SensorData &data) {
-  message.replace("*", "");
-  int latIndex = message.indexOf("LAT:");
-  int lonIndex = message.indexOf("LON:");
-  int stIndex  = message.indexOf("ST:");
-  int accIndex = message.indexOf("ACC:");
+bool parseLoRaMessage(const String& message, SensorData &data) {
+  // Formato esperado: "LAT:lat_val,LON:lon_val;ST:s0,s1,s2,s3,s4;ACC:ax,ay,az"
+  // O sin ACC: "LAT:lat_val,LON:lon_val;ST:s0,s1,s2,s3,s4"
+  
+  String cleanMessage = message;
+  cleanMessage.replace("*", ""); // Eliminar caracteres especiales si los hay
 
-  if (latIndex != -1 && lonIndex != -1 && stIndex != -1) {
-    String latStr = message.substring(latIndex + 4, message.indexOf(",", latIndex));
-    data.latitude = latStr.toFloat();
+  float lat, lon, ax, ay, az;
+  int s0, s1, s2, s3, s4;
 
-    String lonStr = message.substring(lonIndex + 4, message.indexOf(";", lonIndex));
-    data.longitude = lonStr.toFloat();
+  // Intentar analizar el formato con la parte "ACC" primero.
+  // sscanf devuelve el número de campos asignados correctamente.
+  int accScanResult = sscanf(cleanMessage.c_str(), "LAT:%f,LON:%f;ST:%d,%d,%d,%d,%d;ACC:%f,%f,%f",
+                             &lat, &lon, &s0, &s1, &s2, &s3, &s4, &ax, &ay, &az);
 
-    String stStr;
-    if (accIndex != -1) stStr = message.substring(stIndex + 3, accIndex - 1);
-    else stStr = message.substring(stIndex + 3);
-
-    int stParts[5] = {0};
-    int lastIndex = 0;
-    int currentIndex;
-    for (int i = 0; i < 5; i++) {
-      currentIndex = stStr.indexOf(",", lastIndex);
-      String val;
-      if (i < 4 && currentIndex != -1) { val = stStr.substring(lastIndex, currentIndex); lastIndex = currentIndex + 1; }
-      else { val = stStr.substring(lastIndex); }
-      stParts[i] = val.toInt();
-    }
-    data.state = stParts[0];
-    data.sensor1 = stParts[1];
-    data.sensor2 = stParts[2];
-    data.sensor3 = stParts[3];
-    data.sensor4 = stParts[4];
-
-    if (accIndex != -1) {
-      String accStr = message.substring(accIndex + 4);
-      int c1 = accStr.indexOf(",");
-      int c2 = accStr.indexOf(",", c1 + 1);
-      if (c1 != -1 && c2 != -1) {
-        data.accelX = accStr.substring(0, c1).toFloat();
-        data.accelY = accStr.substring(c1 + 1, c2).toFloat();
-        data.accelZ = accStr.substring(c2 + 1).toFloat();
-      }
-    }
-
+  if (accScanResult == 10) { // Los 10 campos se analizaron con éxito
+    data.latitude = lat;
+    data.longitude = lon;
+    data.state = s0;
+    data.sensor1 = s1;
+    data.sensor2 = s2;
+    data.sensor3 = s3;
+    data.sensor4 = s4;
+    data.accelX = ax;
+    data.accelY = ay;
+    data.accelZ = az;
     data.receivedAt = millis();
+    return true;
   }
+
+  // Si falló, intentar analizar sin la parte "ACC"
+  int noAccScanResult = sscanf(cleanMessage.c_str(), "LAT:%f,LON:%f;ST:%d,%d,%d,%d,%d",
+                               &lat, &lon, &s0, &s1, &s2, &s3, &s4);
+
+  if (noAccScanResult == 7) { // Los 7 campos se analizaron con éxito
+    data.latitude = lat;
+    data.longitude = lon;
+    data.state = s0;
+    data.sensor1 = s1;
+    data.sensor2 = s2;
+    data.sensor3 = s3;
+    data.sensor4 = s4;
+    // Reiniciar datos del acelerómetro si no están en el mensaje
+    data.accelX = 0.0f;
+    data.accelY = 0.0f;
+    data.accelZ = 0.0f;
+    data.receivedAt = millis();
+    return true;
+  }
+  // Si ambos intentos de análisis fallan
+  return false;
 }
 
 void printSensorData(const SensorData &data) {
@@ -77,5 +81,3 @@ void printSensorData(const SensorData &data) {
   Serial.printf("Received at: %lu ms\n", data.receivedAt);
   Serial.println("==================");
 }
-
-

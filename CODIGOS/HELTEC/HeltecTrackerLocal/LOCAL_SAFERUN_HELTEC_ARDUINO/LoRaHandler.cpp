@@ -4,6 +4,7 @@
 #include "SensorData.h"
 #include <SPI.h>
 #include "AES.h"  // Librería AES de Matej Sychra
+#include "UI.h"   // Incluir para notificar a la UI de nuevos datos
 
 // =============================================================================
 // GLOBAL VARIABLES
@@ -144,7 +145,7 @@ void configureSX1262() {
     Serial.println("SX1262 LoRa module configured");
 }
 
-bool processLoRaMessage(SensorData &data) {
+bool processLoRaMessage(SensorData &data) { // El parámetro 'data' se mantiene por compatibilidad
     Serial.println("Entro");
     RXPacketL = LT.receive(RXBUFFER, RXBUFFER_SIZE, LORA_TIMEOUT, WAIT_RX);
     PacketRSSI = LT.readPacketRSSI();
@@ -201,16 +202,33 @@ bool processLoRaMessage(SensorData &data) {
         String packetDescifrado = descifrarValor(packet);
         Serial.println(packetDescifrado);
         // Parse the message and populate sensor data
-        parseLoRaMessage(packetDescifrado, data);
-        
-        // Set RSSI and SNR values
-        data.rssi = PacketRSSI;
-        data.snr = PacketSNR;
-        
-        // Update last packet string for web interface
-        lastPacket = String(millis() / 1000) + "s," + packetDescifrado + "," + String(PacketRSSI) + "dBm," + String(PacketSNR) + "dB";
-        
-        return true;
+        SensorData tempData;
+        initSensorData(tempData); // Inicializar con valores por defecto
+
+        if (parseLoRaMessage(packetDescifrado, tempData)) {
+            // El parseo fue exitoso
+
+            // Añadir RSSI y SNR a los datos
+            tempData.rssi = PacketRSSI;
+            tempData.snr = PacketSNR;
+
+            // Actualizar el struct 'data' pasado por referencia (para compatibilidad con el loop principal)
+            data = tempData;
+
+            // --- CONEXIÓN EXPLÍCITA CON LA UI ---
+            // Notificar directamente a la UI y otros módulos sobre los nuevos datos.
+            // Esto hace que la actualización sea inmediata y visible en la pantalla "Remoto".
+            updateLocalLoRaData(tempData);
+            updateTrackingData(tempData);
+            // Actualizar el string del último paquete para otras interfaces (si se usa)
+            lastPacket = String(millis() / 1000) + "s," + packetDescifrado + "," + String(PacketRSSI) + "dBm," + String(PacketSNR) + "dB";
+            
+            return true;
+        } else {
+            // El parseo falló
+            Serial.println("Error: Fallo al parsear el mensaje LoRa.");
+            return false;
+        }
     }
 }
 
@@ -235,5 +253,3 @@ void printPacketStats() {
 String getLastPacketString() {
     return lastPacket;
 }
-
-
