@@ -16,5 +16,5 @@ struct SensorData {
 };
 
 void initSensorData(SensorData &data);
-bool parseLoRaMessage(const String& message, SensorData &data);
+bool parseLoRaMessage(String message, SensorData &data);
 void printSensorData(const SensorData &data);
