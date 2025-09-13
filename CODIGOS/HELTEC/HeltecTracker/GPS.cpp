@@ -17,6 +17,19 @@ void handleMonitoringScreen() {
   // Se actualiza desde los eventos de botón
 }
 
+void handleExerciseScreen() {
+  if(isMonitoringActive) {
+    unsigned long elapsed = getExerciseElapsed(now);
+    unsigned long sec = elapsed / 1000; unsigned int hh = sec / 3600; sec %= 3600; unsigned int mm = sec / 60; unsigned int ss = sec % 60;
+    char tbuf[24]; snprintf(tbuf, sizeof(tbuf), "%02u:%02u:%02u", hh, mm, ss);
+    st7735.st7735_write_str(45, 31, tbuf, Font_7x10, ST7735_WHITE, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
+    
+    //st7735.st7735_write_str(0, 28, tbuf, Font_7x10, ST7735_WHITE);
+    char dbuf[24]; snprintf(dbuf, sizeof(dbuf), "Dist: %.1f m", exerciseDistanceMeters);
+    st7735.st7735_write_str(40, 60, dbuf, Font_7x10, ST7735_WHITE);
+  }
+}
+/*
 void drawFolderScreen(bool firstDraw) {
   static int lastFolderLocal = 0;
   if (firstDraw) {
@@ -35,37 +48,120 @@ void drawFolderScreen(bool firstDraw) {
     lastFolderLocal = currentFolder;
   }
 }
+*/
 
 void handleFolderScreen() {
   // Lógica se maneja en eventos de botón
 }
 
 void configureGPS() {
+  Serial.println("Iniciando configuración GPS...");
+  
+  // Configurar pin de alimentación del GPS
   pinMode(VGNSS_CTRL, OUTPUT);
   digitalWrite(VGNSS_CTRL, HIGH);
+  delay(500); // Dar tiempo para que el GPS se encienda
+  
+  // Inicializar comunicación serial con GPS
   Serial1.begin(115200, SERIAL_8N1, 33, 34);
-  delay(100);
+  delay(1000); // Dar más tiempo para estabilización
+  
+  // Limpiar buffer inicial
+  while (Serial1.available() > 0) {
+    Serial1.read();
+  }
+  
+  Serial.println("GPS configurado en pines 33 (RX) y 34 (TX)");
+  Serial.println("Esperando señal GPS...");
+  
+  // Inicializar variables de estado
+  gpsDataValid = false;
+  lastGPSUpdate = 0;
 }
 
 void getGpsData() {
+  // Procesar datos GPS solo si hay datos disponibles
+  if (Serial1.available() == 0) return;
+  
   while (Serial1.available() > 0) {
-    if (Serial1.peek() != '\n') gps.encode(Serial1.read());
-    else {
+    if (Serial1.peek() != '\n') {
+      gps.encode(Serial1.read());
+    } else {
       Serial1.read();
+      
+      // Solo procesar si tenemos datos de tiempo válidos
       if (gps.time.second() == 0) continue;
-      String new_time_str = String(gps.time.hour()) + ":" + String(gps.time.minute()) + ":" + String(gps.time.second()) + ":" + String(gps.time.centisecond());
+      
+      // Crear strings de tiempo y coordenadas
+      String new_time_str = String(gps.time.hour()) + ":" + 
+                           String(gps.time.minute()) + ":" + 
+                           String(gps.time.second()) + ":" + 
+                           String(gps.time.centisecond());
+      
       String new_latitude = String("LAT: ") + String(gps.location.lat(), 6);
       String new_longitude = String("LON: ") + String(gps.location.lng(), 6);
 
-      // Redibujo parcial solo si cambian
-      updateGPSFieldsIfChanged(new_time_str, new_latitude, new_longitude);
-      // Actualiza estado en memoria
+      // Validar si las coordenadas son válidas
+      bool coordsValid = gps.location.isValid() && 
+                        gps.location.lat() != 0.0 && 
+                        gps.location.lng() != 0.0;
+      
+      // Actualizar estado del GPS
+      if (coordsValid) {
+        gpsDataValid = true;
+        lastGPSUpdate = millis();
+        Serial.println("GPS: Coordenadas válidas obtenidas");
+      } else {
+        // Si no hay coordenadas válidas por más de 30 segundos, marcar como inválido
+        if (millis() - lastGPSUpdate > 30000) {
+          gpsDataValid = false;
+        }
+      }
+
+      // Actualizar variables globales
+      /*
       time_str = new_time_str;
       latitude = new_latitude;
       longitude = new_longitude;
+      */
+      Serial.println("GPS: Datos actualizados");
+      Serial.println(new_latitude);
+
+      // Redibujar pantalla GPS si está activa
+      updateGPSFieldsIfChanged(new_time_str, new_latitude, new_longitude);
+
+      // Acumular distancia de ejercicio si está grabando (usando TinyGPS++)
+      if (isMonitoringActive && gps.location.isValid()) {
+        double latf = gps.location.lat();
+        double lonf = gps.location.lng();
+        if (lastExercisePosSet) {
+          double dist = TinyGPSPlus::distanceBetween(lastExerciseLat, lastExerciseLon, latf, lonf);
+          if (dist > 0.1 && dist < 1000.0) exerciseDistanceMeters += (float)dist;
+        }
+        lastExerciseLat = (float)latf; lastExerciseLon = (float)lonf; lastExercisePosSet = true;
+      }
+      
+      // Limpiar buffer
       while (Serial1.read() > 0) {}
     }
   }
+}
+
+bool isGPSValid() {
+  return gpsDataValid && gps.location.isValid() && 
+         (millis() - lastGPSUpdate) < 1000; // 1 minuto de timeout
+}
+
+float getLatitude() {
+  return gps.location.lat();
+}
+
+float getLongitude() {
+  return gps.location.lng();
+}
+
+String getTimeString() {
+  return time_str;
 }
 
 

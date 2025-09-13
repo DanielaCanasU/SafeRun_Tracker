@@ -8,7 +8,15 @@ void getGpsData();
 void handleGPSScreen();
 void handleMP3Screen();
 void handleMonitoringScreen();
-void drawFolderScreen(bool firstDraw = false);
+void handleExerciseScreen();
+
+//void drawFolderScreen(bool firstDraw = false);
 void handleFolderScreen();
+
+// Funciones de utilidad GPS
+bool isGPSValid();
+float getLatitude();
+float getLongitude();
+String getTimeString();
 
 

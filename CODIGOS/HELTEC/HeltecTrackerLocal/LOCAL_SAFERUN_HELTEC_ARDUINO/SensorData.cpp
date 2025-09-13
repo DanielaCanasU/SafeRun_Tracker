@@ -13,55 +13,57 @@ void initSensorData(SensorData &data) {
 
 bool parseLoRaMessage(String message, SensorData &data) {
   message.replace("*", "");
-  int latIndex = message.indexOf("LAT:");
-  int lonIndex = message.indexOf("LON:");
   int stIndex  = message.indexOf("ST:");
   int accIndex = message.indexOf("ACC:");
 
-  if (latIndex != -1 && lonIndex != -1 && stIndex != -1) {
+  if (stIndex == -1) return false;
+
+  // Intentar extraer GPS si existe
+  int latIndex = message.indexOf("LAT:");
+  int lonIndex = message.indexOf("LON:");
+  if (latIndex != -1 && lonIndex != -1) {
     String latStr = message.substring(latIndex + 4, message.indexOf(",", latIndex));
     data.latitude = latStr.toFloat();
-
     String lonStr = message.substring(lonIndex + 4, message.indexOf(";", lonIndex));
     data.longitude = lonStr.toFloat();
-
-    String stStr;
-    if (accIndex != -1) stStr = message.substring(stIndex + 3, accIndex - 1);
-    else stStr = message.substring(stIndex + 3);
-
-    int stParts[5] = {0};
-    int lastIndex = 0;
-    int currentIndex;
-    for (int i = 0; i < 5; i++) {
-      currentIndex = stStr.indexOf(",", lastIndex);
-      String val;
-      if (i < 4 && currentIndex != -1) { val = stStr.substring(lastIndex, currentIndex); lastIndex = currentIndex + 1; }
-      else { val = stStr.substring(lastIndex); }
-      stParts[i] = val.toInt();
-    }
-    data.state = stParts[0];
-    data.sensor1 = stParts[1];
-    data.sensor2 = stParts[2];
-    data.sensor3 = stParts[3];
-    data.sensor4 = stParts[4];
-
-    if (accIndex != -1) {
-      String accStr = message.substring(accIndex + 4);
-      int c1 = accStr.indexOf(",");
-      int c2 = accStr.indexOf(",", c1 + 1);
-      if (c1 != -1 && c2 != -1) {
-        data.accelX = accStr.substring(0, c1).toFloat();
-        data.accelY = accStr.substring(c1 + 1, c2).toFloat();
-        data.accelZ = accStr.substring(c2 + 1).toFloat();
-      }
-    }
-    Serial.println(data.state);
-
-    data.receivedAt = millis();
-    return true;
+  } else {
+    data.latitude = 0.0f;
+    data.longitude = 0.0f;
   }
-  // Si ambos intentos de análisis fallan
-  return false;
+
+  // Extraer ST hasta antes de ACC o hasta final
+  String stStr;
+  if (accIndex != -1) stStr = message.substring(stIndex + 3, accIndex - 1);
+  else stStr = message.substring(stIndex + 3);
+
+  int stParts[5] = {0};
+  int lastIndex = 0;
+  int currentIndex;
+  for (int i = 0; i < 5; i++) {
+    currentIndex = stStr.indexOf(",", lastIndex);
+    String val;
+    if (i < 4 && currentIndex != -1) { val = stStr.substring(lastIndex, currentIndex); lastIndex = currentIndex + 1; }
+    else { val = stStr.substring(lastIndex); }
+    stParts[i] = val.toInt();
+  }
+  data.state = stParts[0];
+  data.sensor1 = stParts[1];
+  data.sensor2 = stParts[2];
+  data.sensor3 = stParts[3];
+  data.sensor4 = stParts[4];
+
+  if (accIndex != -1) {
+    String accStr = message.substring(accIndex + 4);
+    int c1 = accStr.indexOf(",");
+    int c2 = accStr.indexOf(",", c1 + 1);
+    if (c1 != -1 && c2 != -1) {
+      data.accelX = accStr.substring(0, c1).toFloat();
+      data.accelY = accStr.substring(c1 + 1, c2).toFloat();
+      data.accelZ = accStr.substring(c2 + 1).toFloat();
+    }
+  }
+  data.receivedAt = millis();
+  return true;
 }
 
 void printSensorData(const SensorData &data) {

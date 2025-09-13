@@ -16,7 +16,7 @@ class SX126XLT;
 #define ST7735_GRAY ST7735_COLOR565(128, 128, 128)
 
 // Menú y opciones MP3
-enum MenuScreen { SCREEN_GPS, SCREEN_MP3_FOLDER, SCREEN_MP3_PLAYER, SCREEN_MONITORING, SCREEN_COUNT };
+enum MenuScreen { SCREEN_MAIN_MENU, SCREEN_GPS, SCREEN_MP3_FOLDER, SCREEN_MP3_PLAYER, SCREEN_MONITORING, SCREEN_INFO, SCREEN_EXERCISE, SCREEN_EMERGENCY, SCREEN_COUNT };
 enum MP3Option { MP3_PLAY_PAUSE, MP3_NEXT, MP3_VOL_UP, MP3_VOL_DOWN, MP3_PREV, MP3_OPTION_COUNT };
 
 // Estado botones
@@ -54,6 +54,8 @@ extern unsigned long lastSendTime_GPS;
 extern String latitude;
 extern String longitude;
 extern String time_str;
+extern bool gpsDataValid;
+extern unsigned long lastGPSUpdate;
 
 // Acelerómetro y monitoreo
 extern float x, y, z;
@@ -77,7 +79,26 @@ extern bool isPlaying;
 extern uint8_t currentFolder, lastFolder, maxFolders, currentSong;
 extern bool folderSelected;
 
+// Menú principal
+extern int mainMenuSelection;
+extern const int MAIN_MENU_OPTIONS;
+extern int lastMainMenuIdx;
+extern MenuScreen lastRenderedScreen;
+
 // Botones
 extern ButtonState leftButton, rightButton, selectButton;
+
+// Ejercicio
+//extern bool exerciseRecording;
+extern unsigned long exerciseStartMs;
+extern unsigned long exercisePausedAccumMs;
+extern float exerciseDistanceMeters;
+extern bool lastExercisePosSet;
+extern float lastExerciseLat;
+extern float lastExerciseLon;
+
+// Emergencia UI
+//extern bool emergencyActiveUI;
+extern bool emergencyConfirmDeactivate;
 
 
