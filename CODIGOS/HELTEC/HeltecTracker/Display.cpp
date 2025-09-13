@@ -188,9 +188,10 @@ void drawGPSScreen(bool firstDraw, bool updateLatitude, bool updateLongitude) {
   
   // Verificar si hay coordenadas GPS válidas usando la función mejorada
   bool gpsValid = isGPSValid();
-  
+  static bool firstValidGps = false;
+
   if (gpsValid) {
-    if(firstDraw) {        
+    if(firstDraw || !firstValidGps) {        
       st7735.st7735_fill_screen(ST7735_BLACK);
 
       st7735.st7735_write_str(0, 0, "GPS Dispositivo", Font_7x10, ST7735_WHITE);
@@ -202,6 +203,7 @@ void drawGPSScreen(bool firstDraw, bool updateLatitude, bool updateLongitude) {
       st7735.st7735_write_str(0, 65, longitude.c_str(), Font_7x10, ST7735_WHITE);
     }
     else {
+      firstValidGps = true;
       if(updateLatitude) {
         // Actualizar solo la latitud 
         st7735.st7735_fill_rectangle(0, 35, 128, 15, ST7735_BLACK);
@@ -365,24 +367,21 @@ void drawInfoScreen() {
 // ====== Nuevas pantallas ======
 static unsigned long fallPopupEndMs = 0;
 static bool fallPopupActive = false;
-static unsigned long getExerciseElapsed(unsigned long now) {
-  if (!isMonitoringActive) return exercisePausedAccumMs;
-  return exercisePausedAccumMs + (now - exerciseStartMs);
-}
 
 void drawExerciseScreen(bool firstDraw) {
   if (firstDraw) {
-    drawHeaderWithWiFi("EJERCICIO");
     st7735.st7735_fill_screen(ST7735_BLACK);
+    //drawHeaderWithWiFi("EJERCICIO");
+    st7735.st7735_write_str(45, 5, "EJERCICIO", Font_7x10, ST7735_WHITE);
   
   }
   unsigned long now = millis();
   //st7735.st7735_write_str(0, 16, isMonitoringActive ? "Estado: Grabando" : "Estado: En pausa", Font_7x10, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
-  drawRoundedRectangle(30, 20, 100, 30, 4, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
+  drawRoundedRectangle(20, 20, 115, 35, 4, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
   unsigned long elapsed = getExerciseElapsed(now);
   unsigned long sec = elapsed / 1000; unsigned int hh = sec / 3600; sec %= 3600; unsigned int mm = sec / 60; unsigned int ss = sec % 60;
   char tbuf[24]; snprintf(tbuf, sizeof(tbuf), "%02u:%02u:%02u", hh, mm, ss);
-  st7735.st7735_write_str(45, 31, tbuf, Font_7x10, ST7735_WHITE, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
+  st7735.st7735_write_str(35, 28, tbuf, Font_11x18, isMonitoringActive ? ST7735_BLACK : ST7735_WHITE, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
   
   //st7735.st7735_write_str(0, 28, tbuf, Font_7x10, ST7735_WHITE);
   char dbuf[24]; snprintf(dbuf, sizeof(dbuf), "Dist: %.1f m", exerciseDistanceMeters);
@@ -403,20 +402,23 @@ void drawExerciseScreen(bool firstDraw) {
 void drawEmergencyScreen(bool firstDraw) {
   if (firstDraw) {
     st7735.st7735_fill_screen(ST7735_BLACK);
-    drawHeaderWithWiFi("EMERGENCIA");
+    st7735.st7735_write_str(45, 5, "EMERGENCIA", Font_7x10, ST7735_WHITE);
     
   }
   if (!emergencia) {
-    st7735.st7735_write_str(0, 20, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);
-    st7735.st7735_write_str(0, 32, "para enviar SOS", Font_7x10, ST7735_WHITE);
+    drawRoundedRectangle(22, 20, 115, 30, 4, ST7735_GREEN);
+    st7735.st7735_write_str(40, 28, "A SALVO", Font_11x18, ST7735_BLACK, ST7735_GREEN);
+    st7735.st7735_write_str(5, 60, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);
+    st7735.st7735_write_str(25, 70, "para enviar SOS", Font_7x10, ST7735_WHITE);
   } else {
-    st7735.st7735_write_str(0, 20, "\xC2\xA1SOS Enviado!", Font_11x18, ST7735_RED);
+    drawRoundedRectangle(22, 20, 115, 30, 4, ST7735_RED);
+    st7735.st7735_write_str(65, 28, "SOS", Font_11x18, ST7735_BLACK, ST7735_RED);
     if (emergencyConfirmDeactivate) {
-      st7735.st7735_write_str(0, 44, "Mantener 3 botones + Sel", Font_7x10, ST7735_WHITE);
-      st7735.st7735_write_str(0, 56, "para apagar", Font_7x10, ST7735_WHITE);
+      st7735.st7735_write_str(35, 60, "Presionar Sel", Font_7x10, ST7735_WHITE);
+      st7735.st7735_write_str(40, 70, "para apagar", Font_7x10, ST7735_WHITE);
     } else {
-      st7735.st7735_write_str(0, 44, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);
-      st7735.st7735_write_str(0, 56, "para pedir apagar", Font_7x10, ST7735_WHITE);
+      st7735.st7735_write_str(5, 60, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);
+      st7735.st7735_write_str(25, 70, "para pedir apagar", Font_7x10, ST7735_WHITE);
     }
   }
 }
@@ -675,5 +677,3 @@ void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bgcolor) 
     } break;
   }
 }
-
-

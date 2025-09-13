@@ -87,6 +87,10 @@ void loop() {
   } else if (currentScreen == SCREEN_INFO) {
     // La pantalla de info no necesita actualizaciones constantes
   }
+  else if (currentScreen == SCREEN_EXERCISE) {
+    handleExerciseScreen();
+  }
+
 
   // Monitoreo acelerómetro
   accelLoop();

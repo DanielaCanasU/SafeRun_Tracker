@@ -18,5 +18,4 @@ bool isGPSValid();
 float getLatitude();
 float getLongitude();
 String getTimeString();
-
-
+unsigned long getExerciseElapsed(unsigned long now);

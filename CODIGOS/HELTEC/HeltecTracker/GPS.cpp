@@ -17,12 +17,18 @@ void handleMonitoringScreen() {
   // Se actualiza desde los eventos de botón
 }
 
+unsigned long getExerciseElapsed(unsigned long now) {
+  if (!isMonitoringActive) return exercisePausedAccumMs;
+  return exercisePausedAccumMs + (now - exerciseStartMs);
+}
+
 void handleExerciseScreen() {
   if(isMonitoringActive) {
+    unsigned long now = millis();
     unsigned long elapsed = getExerciseElapsed(now);
     unsigned long sec = elapsed / 1000; unsigned int hh = sec / 3600; sec %= 3600; unsigned int mm = sec / 60; unsigned int ss = sec % 60;
     char tbuf[24]; snprintf(tbuf, sizeof(tbuf), "%02u:%02u:%02u", hh, mm, ss);
-    st7735.st7735_write_str(45, 31, tbuf, Font_7x10, ST7735_WHITE, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
+    st7735.st7735_write_str(35, 28, tbuf, Font_11x18, isMonitoringActive ? ST7735_BLACK : ST7735_WHITE, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
     
     //st7735.st7735_write_str(0, 28, tbuf, Font_7x10, ST7735_WHITE);
     char dbuf[24]; snprintf(dbuf, sizeof(dbuf), "Dist: %.1f m", exerciseDistanceMeters);
@@ -163,5 +169,3 @@ float getLongitude() {
 String getTimeString() {
   return time_str;
 }
-
-
