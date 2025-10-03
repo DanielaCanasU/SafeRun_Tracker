@@ -985,11 +985,25 @@ static void renderWaypointManager() {
   
   // Indicadores de scroll
   if (waypointCount > 3) {
-    if (waypointScrollOffset > 0) {
-      st7735.st7735_write_str(140, 16, "^", Font_7x10, ST7735_GRAY); // Flecha arriba
-    }
     if (waypointScrollOffset < maxScrollOffset) {
-      st7735.st7735_write_str(140, 56, "v", Font_7x10, ST7735_GRAY); // Flecha abajo
+      // Triángulo arriba (relleno)
+      for (int dy = 0; dy < 8; dy++) {
+          int startX = 140 + dy;
+          int endX = 148 - dy;
+          for (int x = startX; x <= endX; x++) {
+              st7735.st7735_draw_pixel(x, 56 + 7 + dy, ST7735_GRAY);
+          }
+      }
+    }
+    if (waypointScrollOffset > 0) {
+        // Triángulo abajo (relleno)
+        for (int dy = 0; dy < 8; dy++) {
+            int startX = 140 + dy;
+            int endX = 148 - dy;
+            for (int x = startX; x <= endX; x++) {
+                st7735.st7735_draw_pixel(x, 16 - dy, ST7735_GRAY);
+            }
+        }
     }
   }
   
@@ -1435,11 +1449,16 @@ void updateUI(unsigned long now) {
       }
       if (readBtnDown()) {
         if (waypointCount > 0) {
+          int prevSelected = selectedWaypointIndex;
           selectedWaypointIndex = (selectedWaypointIndex + 1) % waypointCount;
           
           // Ajustar scroll si es necesario
           if (selectedWaypointIndex >= waypointScrollOffset + 3) {
             waypointScrollOffset = min(maxScrollOffset, selectedWaypointIndex - 2);
+          }
+          // Si dimos la vuelta al inicio, mostrar los primeros 3
+          if (prevSelected == waypointCount - 1 && selectedWaypointIndex == 0) {
+            waypointScrollOffset = 0;
           }
         }
       }
