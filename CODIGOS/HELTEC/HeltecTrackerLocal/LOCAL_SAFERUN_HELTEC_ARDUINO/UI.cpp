@@ -6,6 +6,9 @@
 #include <WiFi.h>
 #include <Preferences.h>
 
+// Función robusta de mapeo flotante
+int mapf(float value, float in_min, float in_max, int out_min, int out_max);
+
 // Variables globales para datos LoRa (deben estar antes de cualquier uso) hola
 static SensorData lastLoRaData = {};
 static unsigned long lastLoRaReceived = 0;
@@ -20,7 +23,7 @@ static void renderInfoScreen();
 #define ST7735_GRAY ST7735_COLOR565(128, 128, 128)
 
 // Menu state (mirrors ESP32 OLEDMenu)
-enum class MenuScreen { Welcome, SelectMode, MenuPrincipal, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing };
+enum class MenuScreen { Welcome, SelectMode, MenuPrincipal, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing, BacktrackMap };
 static MenuScreen currentScreen = MenuScreen::Welcome;
 static bool wifiConnected = false;
 
@@ -109,13 +112,19 @@ struct Waypoint {
 };
 
 // Sistema de backtrack
-static const int MAX_WAYPOINTS = 10;
+static const int MAX_WAYPOINTS = 30;
 static Waypoint waypoints[MAX_WAYPOINTS];
 static int waypointCount = 0;
 static int selectedWaypointIndex = -1;
 
 // Variables de scroll para waypoints
 static int waypointScrollOffset = 0;
+
+// Cache para minimapa (evitar redibujado innecesario)
+static float lastMapLat = -999.0f;
+static float lastMapLon = -999.0f;
+static int lastMapWaypointCount = -1;
+static int lastMapSelectedIdx = -2;
 
 // Navegación hacia waypoint seleccionado
 static NavigationData waypointNavigation;
@@ -1074,6 +1083,158 @@ static void renderBacktrack() {
   // drawFooter("OK: waypoints | BACK: menu");
 }
 
+// 1. Agregar nuevo estado de pantalla para el minimapa:
+static void renderBacktrackMap() {
+    if (lastRenderedScreen != MenuScreen::BacktrackMap) {
+        st7735.st7735_fill_screen(ST7735_BLACK);
+        st7735.st7735_write_str(10, 0, "Mapa de ruta", Font_7x10, MORADO);
+        lastRenderedScreen = MenuScreen::BacktrackMap;
+    }
+    if (waypointCount == 0) {
+        st7735.st7735_write_str(10, 40, "No hay puntos", Font_7x10, ST7735_GRAY);
+        return;
+    }
+    
+    // Verificar si algo cambió para evitar redibujado innecesario
+    bool needsRedraw = false;
+    if (fabs(localLatitude - lastMapLat) > 0.00001f || 
+        fabs(localLongitude - lastMapLon) > 0.00001f ||
+        waypointCount != lastMapWaypointCount ||
+        selectedWaypointIndex != lastMapSelectedIdx) {
+        needsRedraw = true;
+        lastMapLat = localLatitude;
+        lastMapLon = localLongitude;
+        lastMapWaypointCount = waypointCount;
+        lastMapSelectedIdx = selectedWaypointIndex;
+    }
+    
+    if (!needsRedraw) {
+        return; // No redibujar si nada cambió
+    }
+    
+    // Limpiar solo el área del mapa (no toda la pantalla)
+    fillRectPixels(10, 10, 140, 60, ST7735_BLACK);
+    
+    // --- Filtrar puntos cercanos ---
+    const float MAX_DIST_KM = 5.0f;
+    int nearbyIdx[MAX_WAYPOINTS];
+    int nearbyCount = 0;
+    float refLat = localLatitude;
+    float refLon = localLongitude;
+    bool useNearby = localPositionSet;
+    if (useNearby) {
+        for (int i = 0; i < waypointCount; i++) {
+            float dLat = radians(waypoints[i].latitude - refLat);
+            float dLon = radians(waypoints[i].longitude - refLon);
+            float a = sin(dLat/2)*sin(dLat/2) + cos(radians(refLat))*cos(radians(waypoints[i].latitude))*sin(dLon/2)*sin(dLon/2);
+            float c = 2 * atan2(sqrt(a), sqrt(1-a));
+            float dist = 6371.0f * c; // Radio Tierra en km
+            if (dist <= MAX_DIST_KM) {
+                nearbyIdx[nearbyCount++] = i;
+            }
+        }
+    }
+    if (useNearby && nearbyCount == 0) {
+        st7735.st7735_write_str(10, 40, "No hay puntos cercanos", Font_7x10, ST7735_GRAY);
+        return;
+    }
+    // Calcular bounding box de los puntos a mostrar
+    float minLat, maxLat, minLon, maxLon;
+    if (useNearby && nearbyCount > 0) {
+        minLat = maxLat = waypoints[nearbyIdx[0]].latitude;
+        minLon = maxLon = waypoints[nearbyIdx[0]].longitude;
+        for (int i = 1; i < nearbyCount; i++) {
+            float lat = waypoints[nearbyIdx[i]].latitude;
+            float lon = waypoints[nearbyIdx[i]].longitude;
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+            if (lon < minLon) minLon = lon;
+            if (lon > maxLon) maxLon = lon;
+        }
+        // Incluir posición actual
+        if (localPositionSet) {
+            if (localLatitude < minLat) minLat = localLatitude;
+            if (localLatitude > maxLat) maxLat = localLatitude;
+            if (localLongitude < minLon) minLon = localLongitude;
+            if (localLongitude > maxLon) maxLon = localLongitude;
+        }
+    } else {
+        minLat = maxLat = waypoints[0].latitude;
+        minLon = maxLon = waypoints[0].longitude;
+        for (int i = 1; i < waypointCount; i++) {
+            if (waypoints[i].latitude < minLat) minLat = waypoints[i].latitude;
+            if (waypoints[i].latitude > maxLat) maxLat = waypoints[i].latitude;
+            if (waypoints[i].longitude < minLon) minLon = waypoints[i].longitude;
+            if (waypoints[i].longitude > maxLon) maxLon = waypoints[i].longitude;
+        }
+        if (localPositionSet) {
+            if (localLatitude < minLat) minLat = localLatitude;
+            if (localLatitude > maxLat) maxLat = localLatitude;
+            if (localLongitude < minLon) minLon = localLongitude;
+            if (localLongitude > maxLon) maxLon = localLongitude;
+        }
+    }
+    float latMargin = (maxLat - minLat) * 0.1f + 0.0001f;
+    float lonMargin = (maxLon - minLon) * 0.1f + 0.0001f;
+    minLat -= latMargin; maxLat += latMargin;
+    minLon -= lonMargin; maxLon += lonMargin;
+    int mapX0 = 10, mapY0 = 10, mapW = 140, mapH = 60;
+    // Forzar rango mínimo para evitar colapso visual
+    if (fabs(maxLat - minLat) < 0.00005f) { maxLat += 0.000025f; minLat -= 0.000025f; }
+    if (fabs(maxLon - minLon) < 0.00005f) { maxLon += 0.000025f; minLon -= 0.000025f; }
+    // Si solo hay un punto, dibujarlo centrado
+    if ((useNearby && nearbyCount == 1) || (!useNearby && waypointCount == 1)) {
+        int x = mapX0 + mapW / 2;
+        int y = mapY0 + mapH / 2;
+        drawCircle(x, y, 5, NARANJA);
+        st7735.st7735_write_str(x+6, y-4, "Punto", Font_7x10, NARANJA);
+        return;
+    }
+    // Dibujar líneas entre puntos cercanos
+    if (useNearby && nearbyCount > 1) {
+        for (int i = 1; i < nearbyCount; i++) {
+            int x0 = mapf(waypoints[nearbyIdx[i-1]].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+            int y0 = mapf(waypoints[nearbyIdx[i-1]].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+            int x1 = mapf(waypoints[nearbyIdx[i]].longitude,   minLon, maxLon, mapX0, mapX0+mapW);
+            int y1 = mapf(waypoints[nearbyIdx[i]].latitude,    maxLat, minLat, mapY0, mapY0+mapH);
+            drawLine(x0, y0, x1, y1, ST7735_GRAY);
+        }
+    } else if (!useNearby && waypointCount > 1) {
+        for (int i = 1; i < waypointCount; i++) {
+            int x0 = mapf(waypoints[i-1].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+            int y0 = mapf(waypoints[i-1].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+            int x1 = mapf(waypoints[i].longitude,   minLon, maxLon, mapX0, mapX0+mapW);
+            int y1 = mapf(waypoints[i].latitude,    maxLat, minLat, mapY0, mapY0+mapH);
+            drawLine(x0, y0, x1, y1, ST7735_GRAY);
+        }
+    }
+    // Dibujar los puntos
+    if (useNearby && nearbyCount > 0) {
+        for (int i = 0; i < nearbyCount; i++) {
+            int idx = nearbyIdx[i];
+            int x = mapf(waypoints[idx].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+            int y = mapf(waypoints[idx].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+            uint16_t color = (idx == selectedWaypointIndex) ? MORADO : NARANJA;
+            drawCircle(x, y, 3, color);
+        }
+    } else {
+        for (int i = 0; i < waypointCount; i++) {
+            int x = mapf(waypoints[i].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+            int y = mapf(waypoints[i].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+            uint16_t color = (i == selectedWaypointIndex) ? MORADO : NARANJA;
+            drawCircle(x, y, 3, color);
+        }
+    }
+    // Dibuja la posición actual
+    if (localPositionSet) {
+        int x = mapf(localLongitude, minLon, maxLon, mapX0, mapX0+mapW);
+        int y = mapf(localLatitude,  maxLat, minLat, mapY0, mapY0+mapH);
+        drawCircle(x, y, 5, ST7735_WHITE);
+        st7735.st7735_write_str(x+6, y-4, "Tú", Font_7x10, ST7735_WHITE);
+    }
+    st7735.st7735_write_str(0, 110, "Up/Down: salir", Font_7x10, ST7735_GRAY);
+}
+
 void initUI() {
   // Configure buttons
   pinMode(BTN_UP_PIN, INPUT_PULLUP);
@@ -1540,8 +1701,16 @@ void updateUI(unsigned long now) {
        break;
     }
     
-              case MenuScreen::Backtrack: {
+      case MenuScreen::Backtrack: {
        // OK corto: volver a gestión de waypoints
+       if (readBtnUp()) {
+          currentScreen = MenuScreen::BacktrackMap;
+          lastRenderedScreen = MenuScreen::Backtrack;
+       }
+       if (readBtnDown()) {
+          currentScreen = MenuScreen::BacktrackMap;
+          lastRenderedScreen = MenuScreen::Backtrack;
+       }
        if (readBtnOk()) {
          currentScreen = MenuScreen::WaypointManager;
          lastRenderedScreen = MenuScreen::Info;
@@ -1628,6 +1797,22 @@ void updateUI(unsigned long now) {
         }
         break;
       }
+      // 3. Manejo de botones para entrar/salir del minimapa desde Backtrack:
+      case MenuScreen::BacktrackMap:
+        renderBacktrackMap();
+        if (readBtnDown()) {
+            currentScreen = MenuScreen::Backtrack;
+            lastRenderedScreen = MenuScreen::BacktrackMap; // Forzar redibujado
+        }
+        if (readBtnUp()) {
+            currentScreen = MenuScreen::Backtrack;
+            lastRenderedScreen = MenuScreen::BacktrackMap; // Forzar redibujado
+        }
+        if (readBtnOk()) {
+            currentScreen = MenuScreen::WaypointManager;
+            lastRenderedScreen = MenuScreen::BacktrackMap; // Forzar redibujado
+        }
+        break;
   }
 
 render:
@@ -1695,6 +1880,7 @@ render:
       case MenuScreen::WaypointManager: renderWaypointManager(); break;
       case MenuScreen::Backtrack: renderBacktrack(); break;
       case MenuScreen::Pairing: renderPairing(); break;
+      case MenuScreen::BacktrackMap: renderBacktrackMap(); break;
   }
 }
 
@@ -2149,4 +2335,10 @@ void setPairingRequest(const String& deviceId) {
 void clearPairingRequest() {
   pairingRequestPending = false;
   pairingDeviceId = "";
+}
+
+// Agregar función robusta de mapeo flotante al inicio del archivo (después de includes):
+int mapf(float value, float in_min, float in_max, int out_min, int out_max) {
+    if (fabs(in_max - in_min) < 1e-8) return (out_min + out_max) / 2;
+    return out_min + (int)(((value - in_min) * (out_max - out_min)) / (in_max - in_min));
 }
