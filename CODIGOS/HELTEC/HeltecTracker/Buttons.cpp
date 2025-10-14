@@ -2,6 +2,7 @@
 #include "Display.h"
 #include "DFPlayerMod.h"
 #include "GPS.h"
+#include "AppState.h"
 
 void initButtonsState() {
   leftButton = {0,0,false,false,0,0,0};
@@ -78,8 +79,53 @@ void IRAM_ATTR handleSelectInterrupt() {
 }
 
 void processButtonPress() {
-  if (!needProcessButton && !leftButton.isPressed && !rightButton.isPressed) return;
   unsigned long currentTime = millis();
+  
+  // Detección global de combo 3 botones (izq+der+select): mantener 3s
+  static bool comboPressed = false; 
+  static unsigned long comboStart = 0;
+  static unsigned long comboActivatedTime = 0; // Tiempo cuando se activó el combo
+  static bool comboJustActivated = false; // Flag para indicar que el combo se acaba de activar
+  
+  bool left = leftButton.isPressed; 
+  bool right = rightButton.isPressed; 
+  bool sel = selectButton.isPressed;
+  
+  // Si el combo se acaba de activar, esperar un período de gracia antes de procesar otros botones
+  if (comboJustActivated && (currentTime - comboActivatedTime >= 2000) && !left && !right && !sel) { // 1 segundo de gracia
+    comboJustActivated = false;
+  }
+  
+  // Si estamos en período de gracia después del combo, no procesar otros botones
+  if (comboJustActivated) {
+    return;
+  }
+  
+  if (left && right && sel) {
+    if (!comboPressed) { 
+      comboPressed = true; 
+      comboStart = currentTime; 
+    }
+    else if (currentTime - comboStart >= 3000) {
+      if (!emergencia) {
+        emergencia = true; 
+        emergencyConfirmDeactivate = false;
+      } else {
+        emergencyConfirmDeactivate = true;
+      }
+      currentScreen = SCREEN_EMERGENCY;
+      drawEmergencyScreen(true);
+      comboPressed = false;
+      comboJustActivated = true; // Marcar que el combo se acaba de activar
+      comboActivatedTime = currentTime; // Guardar el tiempo de activación
+      return; // Salir para evitar procesar otros botones
+    }
+  } else {
+    comboPressed = false;
+  }
+  
+  if (!needProcessButton && !leftButton.isPressed && !rightButton.isPressed) return;
+  
   if (currentScreen == SCREEN_MP3_PLAYER) {
     if (leftButton.isPressed && (currentTime - leftButton.pressStartTime >= LONG_PRESS_TIME)) {
       if (currentTime - leftButton.lastVolumeUpdateTime >= VOLUME_UPDATE_INTERVAL) {
@@ -111,6 +157,53 @@ void processButtonPress() {
 }
 
 void handleButtonPress(uint8_t button, bool isLongPress, bool isDoubleClick, bool isTripleClick) {
+  // Manejo del menú principal
+  if (currentScreen == SCREEN_MAIN_MENU) {
+    if (button == BUTTON_LEFT && !isLongPress) {
+      // Navegación hacia arriba (anterior)
+      mainMenuSelection = (mainMenuSelection - 1 + MAIN_MENU_OPTIONS) % MAIN_MENU_OPTIONS;
+      drawMainMenu();
+    } else if (button == BUTTON_RIGHT && !isLongPress) {
+      // Navegación hacia abajo (siguiente)
+      mainMenuSelection = (mainMenuSelection + 1) % MAIN_MENU_OPTIONS;
+      drawMainMenu();
+    } else if (button == BUTTON_SELECT && !isLongPress) {
+      // Navegar a la pantalla seleccionada
+      switch (mainMenuSelection) {
+        case 0: // GPS
+          currentScreen = SCREEN_GPS;
+          drawGPSScreen();
+          break;
+        case 1: // MP3 Player
+          currentScreen = SCREEN_MP3_FOLDER;
+          folderSelected = false;
+          drawFolderScreen(true);
+          break;
+        case 2: // Monitoreo
+          currentScreen = SCREEN_MONITORING;
+          prev_impacto = impacto;
+          prev_free_fall = free_fall;
+          prev_segunda_condicion_caida = segunda_condicion_caida;
+          prev_emergencia = emergencia;
+          drawMonitoringScreen();
+          break;
+        case 3: // Info
+          currentScreen = SCREEN_INFO;
+          drawInfoScreen();
+          break;
+        case 4: // Ejercicio
+          currentScreen = SCREEN_EXERCISE;
+          drawExerciseScreen(true);
+          break;
+        case 5: // Emergencia
+          currentScreen = SCREEN_EMERGENCY;
+          drawEmergencyScreen(true);
+          break;
+      }
+    }
+    return;
+  }
+
   if (currentScreen == SCREEN_MP3_FOLDER) {
     if (button == BUTTON_SELECT && !isLongPress) {
       folderSelected = true; currentScreen = SCREEN_MP3_PLAYER;
@@ -128,13 +221,11 @@ void handleButtonPress(uint8_t button, bool isLongPress, bool isDoubleClick, boo
 
   if (button == BUTTON_SELECT) {
     if (isLongPress) {
-      if (currentScreen == SCREEN_MP3_FOLDER) currentScreen = (MenuScreen)((currentScreen + 2) % SCREEN_COUNT);
-      else if (currentScreen == SCREEN_MP3_PLAYER) currentScreen = SCREEN_MP3_FOLDER;
-      else { currentScreen = (MenuScreen)((currentScreen + 1) % SCREEN_COUNT); Serial.println(currentScreen); }
-      if (currentScreen == SCREEN_GPS) drawGPSScreen();
-      else if (currentScreen == SCREEN_MP3_FOLDER) { folderSelected = false; drawFolderScreen(true); }
-      else if (currentScreen == SCREEN_MONITORING) { prev_impacto = impacto; prev_free_fall = free_fall; prev_segunda_condicion_caida = segunda_condicion_caida; prev_emergencia = emergencia; drawMonitoringScreen(); }
-      Serial.println(currentScreen);
+      // Volver al menú principal desde cualquier pantalla
+      lastRenderedScreen = currentScreen;
+      currentScreen = SCREEN_MAIN_MENU;
+      drawMainMenu();
+      Serial.println("Volviendo al menú principal");
     } else if (isTripleClick) {
       if (currentScreen == SCREEN_MP3_PLAYER) { dfPlayer.reset(); drawMP3Screen(); }
     } else if (isDoubleClick) {
@@ -160,6 +251,17 @@ void handleButtonPress(uint8_t button, bool isLongPress, bool isDoubleClick, boo
         prev_impacto = impacto; prev_free_fall = free_fall; prev_segunda_condicion_caida = segunda_condicion_caida; prev_emergencia = emergencia;
         isMonitoringActive = !isMonitoringActive; drawMonitoringScreen();
       }
+      if (currentScreen == SCREEN_EXERCISE) {
+        // Select: iniciar/detener
+        if (!isMonitoringActive) { isMonitoringActive = true; exerciseStartMs = millis(); lastExercisePosSet = false; }
+        else { isMonitoringActive = false; exercisePausedAccumMs = exercisePausedAccumMs + (millis() - exerciseStartMs); }
+        drawExerciseScreen(false);
+      }
+      if (currentScreen == SCREEN_EMERGENCY && emergencia && emergencyConfirmDeactivate) {
+        // Confirmar apagado de emergencia
+        emergencia = false; emergencyConfirmDeactivate = false;
+        drawEmergencyScreen(true);
+      }
     }
   } else {
     if (isTripleClick) {
@@ -178,6 +280,13 @@ void handleButtonPress(uint8_t button, bool isLongPress, bool isDoubleClick, boo
         if (button == BUTTON_RIGHT) currentMP3Option = (MP3Option)((currentMP3Option + 1) % MP3_OPTION_COUNT);
         else if (button == BUTTON_LEFT) currentMP3Option = (MP3Option)((currentMP3Option + MP3_OPTION_COUNT - 1) % MP3_OPTION_COUNT);
         drawMP3Screen();
+      }
+      if (currentScreen == SCREEN_EXERCISE) {
+        // Izquierda cancela popup de caída
+        static bool fallPopupActiveFlag = false; // local no persistente
+        // drawExerciseScreen ya gestiona con variable global en Display.cpp
+        // No hacemos nada aquí aparte de redibujar
+        drawExerciseScreen(false);
       }
     }
   }
