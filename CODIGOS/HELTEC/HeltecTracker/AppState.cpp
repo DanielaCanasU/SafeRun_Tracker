@@ -27,6 +27,8 @@ unsigned long lastSendTime_GPS = 0;
 String latitude = "";
 String longitude = "";
 String time_str = "";
+bool gpsDataValid = false;
+unsigned long lastGPSUpdate = 0;
 
 float x = 0, y = 0, z = 0;
 float time_dato = 0;
@@ -41,7 +43,7 @@ bool prev_impacto = false, prev_free_fall = false, prev_segunda_condicion_caida 
 
 volatile bool menuNeedsUpdate = false;
 volatile bool needProcessButton = false;
-MenuScreen currentScreen = SCREEN_GPS;
+MenuScreen currentScreen = SCREEN_MAIN_MENU;
 MenuScreen pastScreen = SCREEN_MP3_PLAYER;
 MP3Option currentMP3Option = MP3_PLAY_PAUSE;
 uint8_t currentVolume = 15;
@@ -49,8 +51,26 @@ bool isPlaying = false;
 uint8_t currentFolder = 1, lastFolder = 0, maxFolders = 0, currentSong = 1;
 bool folderSelected = false;
 
+// Menú principal
+int mainMenuSelection = 0;
+const int MAIN_MENU_OPTIONS = 6; // base (GPS, Musica, Monitoreo, Info) — mantendremos 4 visibles; amplíaremos en Display
+int lastMainMenuIdx = -1;
+MenuScreen lastRenderedScreen = SCREEN_COUNT; // Inicializar con valor inválido
+
 ButtonState leftButton = {0,0,false,false,0,0,0};
 ButtonState rightButton = {0,0,false,false,0,0,0};
 ButtonState selectButton = {0,0,false,false,0,0,0};
+
+// Ejercicio/Emergencia estado UI
+//bool exerciseRecording = false;
+unsigned long exerciseStartMs = 0;
+unsigned long exercisePausedAccumMs = 0;
+float exerciseDistanceMeters = 0.0f;
+bool lastExercisePosSet = false;
+float lastExerciseLat = 0.0f;
+float lastExerciseLon = 0.0f;
+
+//bool emergencyActiveUI = false;
+bool emergencyConfirmDeactivate = false;
 
 

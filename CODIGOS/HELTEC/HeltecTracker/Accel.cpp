@@ -131,7 +131,7 @@ void accelLoop() {
     if (impacto) { impacto = false; actual_state_changed_to_false = true; }
     if (free_fall) { free_fall = false; actual_state_changed_to_false = true; }
     if (segunda_condicion_caida) { segunda_condicion_caida = false; actual_state_changed_to_false = true; }
-    if (emergencia) { emergencia = false; actual_state_changed_to_false = true; }
+    //if (emergencia) { emergencia = false; actual_state_changed_to_false = true; }
     if (isCalibrated) { isCalibrated = false; }
     bool prev_states_need_sync = (prev_impacto != impacto || prev_free_fall != free_fall || prev_segunda_condicion_caida != segunda_condicion_caida || prev_emergencia != emergencia);
     if (actual_state_changed_to_false || prev_states_need_sync) {
