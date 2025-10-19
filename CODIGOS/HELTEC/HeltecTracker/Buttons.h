@@ -1,8 +1,16 @@
 #pragma once
 #include <Arduino.h>
-#include "AppState.h"
 #include "Config.h"
 #include "Pins.h"
+
+class Botones {
+    private:  
+      int pin;
+
+    public:
+        Botones();
+        void init();
+};
 
 void initButtonsState();
 void IRAM_ATTR handleLeftInterrupt();

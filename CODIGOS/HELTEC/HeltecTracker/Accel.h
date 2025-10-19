@@ -4,13 +4,22 @@
 #include "AppState.h"
 #include "Config.h"
 
-void checkSetupAcelerometro();
-void setupAcelerometro();
+//void checkSetupAcelerometro();
+//void setupAcelerometro();
 float getCalibracionAcelerometro(char eje);
 void readAcelerometroData();
 void calibrateStandingPosition();
 bool isPersonStanding();
 float calcularMagnitud(float x, float y, float z);
 void accelLoop();
+
+class DetectorCaida {
+    private:
+        int estado;
+    public:
+        DetectorCaida();
+        void init();
+        void checkConfig();
+};
 
 

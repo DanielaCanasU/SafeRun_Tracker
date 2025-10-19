@@ -2,6 +2,36 @@
 #include "Display.h"
 #include <HT_TinyGPS++.h>
 
+Geolocation::Geolocation(){}
+
+
+void Geolocation::init(){
+  
+  // Configurar pin de alimentación del GPS
+  pinMode(VGNSS_CTRL, OUTPUT);
+  digitalWrite(VGNSS_CTRL, HIGH);
+  delay(500); // Dar tiempo para que el GPS se encienda
+  
+  // Inicializar comunicación serial con GPS
+  Serial1.begin(115200, SERIAL_8N1, 33, 34);
+  delay(1000); // Dar más tiempo para estabilización
+  
+  // Limpiar buffer inicial
+  while (Serial1.available() > 0) {
+    Serial1.read();
+  }
+  
+  Serial.println("--------------------------------");
+  Serial.println("GEOLOCALIZACION INICIADO CORRECTAMENTE");
+  Serial.println("--------------------------------");
+;
+  
+  // Inicializar variables de estado
+  gpsDataValid = false;
+  lastGPSUpdate = 0;
+}
+
+
 void handleGPSScreen() {
   if (currentScreen != pastScreen) {
     pastScreen = currentScreen;

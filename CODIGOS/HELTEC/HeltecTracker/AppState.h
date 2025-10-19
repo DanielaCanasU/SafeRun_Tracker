@@ -8,6 +8,13 @@ class TinyGPSPlus;
 class DFRobotDFPlayerMini;
 class Adafruit_ADXL345_Unified;
 class SX126XLT;
+class Botones;
+class Display;
+class Musica;
+class Geolocation;
+class DetectorCaida;
+class LoRa;
+class Bateria;
 
 // Colores usados en Display
 #define NARANJA ST7735_COLOR565(243, 91, 4)
@@ -36,6 +43,13 @@ extern TinyGPSPlus gps;
 extern DFRobotDFPlayerMini dfPlayer;
 extern Adafruit_ADXL345_Unified acelerometro;
 extern SX126XLT LT;
+extern Botones botones;
+extern DetectorCaida detectorCaida;
+extern Musica musica;
+extern Display display;
+extern Geolocation geolocation;
+extern LoRa loRa;
+
 
 // Estado global
 extern std::vector<int> lista_canciones;

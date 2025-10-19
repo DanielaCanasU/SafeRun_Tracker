@@ -18,53 +18,16 @@
 #include "Battery.h"
 
 void setup() {
-  // Pines botones
-  pinMode(BUTTON_LEFT, INPUT_PULLUP);
-  pinMode(BUTTON_RIGHT, INPUT_PULLUP);
-  pinMode(BUTTON_SELECT, INPUT_PULLUP);
-  pinMode(2, INPUT_PULLUP);
-
-  analogReadResolution(12);
-
-  // Interrupciones botones
-  attachInterrupt(digitalPinToInterrupt(BUTTON_LEFT), handleLeftInterrupt, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_RIGHT), handleRightInterrupt, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_SELECT), handleSelectInterrupt, CHANGE);
-
-  // Estado inicial de botones
-  initButtonsState();
-
   Serial.begin(115200);
-
-  // I2C acelerómetro
-  Wire.begin(ADXL345_SDA_PIN, ADXL345_SCL_PIN);
-
-  // Pantalla
-  displayInit();
-  st7735.st7735_fill_screen(ST7735_BLACK);
-  drawMainMenu();
-
-  // LoRa SX1262
-  SPI.begin();
-  if (LT.begin(NSS, NRESET, RFBUSY, DIO1, DIO2, DIO3, RX_EN, TX_EN, SW, LORA_DEVICE)) {
-    Serial.println(F("LoRa Device found"));
-    delay(1000);
-  } else {
-    Serial.println(F("No device responding"));
-  }
-  configureSX1262();
-
-  // GPS
-  Serial.println("Configurando GPS...");
-  configureGPS();
-
-  // DFPlayer (opcional)
-  Serial.println("Configurando DFPlayer Mini...");
-  //configureDFPlayer();
-
-  // Acelerómetro
-  Serial.println("Iniciando ADXL345");
-  setupAcelerometro();
+  delay(1000);
+  //Inicio de subsistemas
+  botones.init();
+  detectorCaida.init();
+  display.init();
+  loRa.init();
+  geolocation.init();
+  //musica.init();
+  analogReadResolution(12);
 }
 
 void loop() {

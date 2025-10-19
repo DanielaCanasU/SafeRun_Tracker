@@ -1,9 +1,16 @@
 #include "AppState.h"
+#include "Buttons.h"
+#include "Accel.h"
+#include "DFPlayerMod.h"
+#include "Display.h"
 #include <HT_st7735.h>
 #include <HT_TinyGPS++.h>
 #include <DFRobotDFPlayerMini.h>
 #include <Adafruit_ADXL345_U.h>
 #include <SX126XLT.h>
+#include "LoRaComm.h"
+#include "GPS.h"
+
 
 // Objetos
 HT_st7735 st7735;
@@ -11,6 +18,12 @@ TinyGPSPlus gps;
 DFRobotDFPlayerMini dfPlayer;
 Adafruit_ADXL345_Unified acelerometro = Adafruit_ADXL345_Unified(12345);
 SX126XLT LT;
+Botones botones;
+DetectorCaida detectorCaida;
+Musica musica;
+Geolocation geolocation;
+LoRa loRa;
+Display display;
 
 // Variables
 std::vector<int> lista_canciones;

@@ -9,3 +9,12 @@ void sendMessage(const char* message, bool verbose = false);
 void checkForIncomingMessage();
 
 
+class LoRa {
+    private:
+        int mensaje;
+    public:
+        LoRa();
+        void init();
+};
+
+

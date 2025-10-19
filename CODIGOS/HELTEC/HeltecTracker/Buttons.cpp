@@ -1,14 +1,34 @@
 #include "Buttons.h"
+#include "Arduino.h"
 #include "Display.h"
 #include "DFPlayerMod.h"
 #include "GPS.h"
 #include "AppState.h"
+#include "Pins.h"
 
-void initButtonsState() {
+Botones::Botones() {
+  // Constructor implementation
+}
+
+void Botones::init(){
+  pinMode(BUTTON_LEFT, INPUT_PULLUP);
+  pinMode(BUTTON_RIGHT, INPUT_PULLUP);
+  pinMode(BUTTON_SELECT, INPUT_PULLUP);
+  pinMode(2, INPUT_PULLUP);
+
+  // Interrupciones botones
+  attachInterrupt(digitalPinToInterrupt(BUTTON_LEFT), handleLeftInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_RIGHT), handleRightInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_SELECT), handleSelectInterrupt, CHANGE);
+
   leftButton = {0,0,false,false,0,0,0};
   rightButton = {0,0,false,false,0,0,0};
   selectButton = {0,0,false,false,0,0,0};
+  Serial.println("--------------------------------");
+  Serial.println("BOTONES INICIADO CORRECTAMENTE");
+  Serial.println("--------------------------------");
 }
+
 
 void IRAM_ATTR handleLeftInterrupt() {
   unsigned long currentTime = millis();

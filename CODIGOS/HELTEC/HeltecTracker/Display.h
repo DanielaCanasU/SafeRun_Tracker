@@ -4,6 +4,15 @@
 #include <HT_st7735.h>
 #include "AppState.h"
 
+class Display {
+    private:
+        int menu;
+    public:
+        Display();
+        void init();
+        void drawMenu(MenuScreen currentMenu, bool firstDraw = true);
+};
+
 void displayInit();
 void drawMenuDots(MenuScreen currentMenu);
 void drawMainMenu();

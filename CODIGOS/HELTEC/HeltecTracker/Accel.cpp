@@ -1,7 +1,41 @@
 #include "Accel.h"
 #include "Display.h"
+#include "Pins.h"
+#include "AppState.h"
 
-void checkSetupAcelerometro() {
+
+DetectorCaida::DetectorCaida(){
+  //hola
+}
+
+void DetectorCaida::init(){
+  Wire.begin(ADXL345_SDA_PIN, ADXL345_SCL_PIN);
+  if (!acelerometro.begin()) {
+    Serial.println("--------------------------------");
+    Serial.println("No se detectó el sensor ADXL345");
+    Serial.println("--------------------------------");
+    delay(500);
+  } else {
+    acelerometro.setFreeFallThreshold(0.38);
+    acelerometro.setFreeFallDuration(0.06);
+    acelerometro.setActivityXYZ(1, 0);
+    acelerometro.setInactivityThreshold(0.1875);
+    acelerometro.setTimeInactivity(5);
+    acelerometro.setInactivityXYZ(1, 1);
+    acelerometro.setDataRate(ADXL345_DATARATE_100_HZ);
+    acelerometro.setActivityThreshold(1.7);
+    acelerometro.useInterrupt(ADXL345_INT1);
+    Serial.println("--------------------------------");
+    Serial.println("ADXL345 INICIADO CORRECTAMENTE");
+    Serial.println("--------------------------------");
+    this->checkConfig();
+  }
+}
+
+void DetectorCaida::checkConfig() {
+  Serial.println("--------------------------------");
+  Serial.println("Configuración:");
+  Serial.println("--------------------------------");
   Serial.print("Free Fall Threshold = "); Serial.println(acelerometro.getFreeFallThreshold());
   Serial.print("Free Fall Duration = "); Serial.println(acelerometro.getFreeFallDuration());
   Serial.println('.');
@@ -37,23 +71,7 @@ void checkSetupAcelerometro() {
   Serial.println(" g");
 }
 
-void setupAcelerometro() {
-  if (!acelerometro.begin()) {
-    Serial.println("No se detectó el sensor ADXL345");
-    delay(500);
-  } else {
-    acelerometro.setFreeFallThreshold(0.38);
-    acelerometro.setFreeFallDuration(0.06);
-    acelerometro.setActivityXYZ(1, 0);
-    acelerometro.setInactivityThreshold(0.1875);
-    acelerometro.setTimeInactivity(5);
-    acelerometro.setInactivityXYZ(1, 1);
-    acelerometro.setDataRate(ADXL345_DATARATE_100_HZ);
-    acelerometro.setActivityThreshold(1.7);
-    acelerometro.useInterrupt(ADXL345_INT1);
-    checkSetupAcelerometro();
-  }
-}
+
 
 float getCalibracionAcelerometro(char eje) {
   float numReadings = 500;

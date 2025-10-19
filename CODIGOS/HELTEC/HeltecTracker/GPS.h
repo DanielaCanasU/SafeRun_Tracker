@@ -19,3 +19,12 @@ float getLatitude();
 float getLongitude();
 String getTimeString();
 unsigned long getExerciseElapsed(unsigned long now);
+
+
+class Geolocation {
+    private:
+        int ubi;
+    public:
+        Geolocation();
+        void init();
+};

@@ -1,9 +1,156 @@
 #include "Display.h"
 #include "GPS.h"
 
-void displayInit() {
-  st7735.st7735_init();
+Display::Display(){
+
 }
+
+void Display::init(){
+  st7735.st7735_init();
+  this->drawMenu(SCREEN_MAIN_MENU,true);
+  Serial.println("--------------------------------");
+  Serial.println("PANTALLA INICIADO CORRECTAMENTE");
+  Serial.println("--------------------------------");
+}
+
+void Display::drawMenu(MenuScreen currentMenu, bool firstDraw){
+  if(currentMenu == SCREEN_MAIN_MENU) {
+    if(firstDraw == true){
+      st7735.st7735_fill_rectangle(0, 20, 128, 70, ST7735_BLACK);
+      drawHeaderWithWiFi("Inicio");
+      // Dibujar la barra blanca de selección UNA SOLA VEZ
+      fillRectPixels(0, 34, 160, 26, ST7735_WHITE);
+      lastRenderedScreen = SCREEN_MAIN_MENU;
+      lastMainMenuIdx = -1; // Forzar un redibujado completo de los items del menú
+    }
+      // Si el índice del menú ha cambiado, redibujar solo los items
+    if (lastMainMenuIdx != mainMenuSelection) {
+      // --- Limpieza selectiva ---
+      // 1. Limpiar el área de texto superior (encima de la barra blanca)
+      st7735.st7735_fill_rectangle(0, 15, 160, 19, ST7735_BLACK);
+
+      // 2. Limpiar el área de texto inferior (debajo de la barra blanca)
+      st7735.st7735_fill_rectangle(0, 60, 160, 20, ST7735_BLACK);
+
+      // 3. Limpiar el contenido anterior de la barra blanca (sin redibujar toda la barra).
+      //    Esto es necesario para borrar el texto e icono antiguos antes de dibujar los nuevos.
+      fillRectPixels(20, 34, 120, 26, ST7735_WHITE); // Limpia el centro de la barra blanca
+
+      // --- Redibujado de items ---
+      const char* menuItems[] = {"GPS", "Musica", "Monitoreo", "Info", "Ejercicio", "Emergencia"};
+
+      // Dibujar opción de arriba (si existe)
+      if (mainMenuSelection > 0) {
+        int aboveIdx = mainMenuSelection - 1;
+        String aboveText = String(menuItems[aboveIdx]);
+        // Calculate centered positions
+        int iconX = 35; // Center of screen (128/2 - 18/2 = 55)
+        int textX = 55; // Icon center + icon width/2 + spacing
+        switch (aboveIdx) {
+          case 0: // GPS
+            textX = 80;
+            iconX = 55;
+            break;
+          case 1: // Musica
+            textX = 68;
+            iconX = 48;
+            break;
+          case 2: // Monitoreo
+            textX = 57;
+            iconX = 37;
+            break;
+          case 3: // Info
+            textX = 75;
+            iconX = 55;
+            break;
+          case 4: // Ejercicio
+            textX = 53;
+            iconX = 33;
+            break;
+        }
+
+        // Icon for above (on black bg) - centered
+        drawMenuIcon(iconX, 15, aboveIdx, false, ST7735_BLACK);
+        st7735.st7735_write_str(textX, 20, aboveText.c_str(), Font_7x10, ST7735_GRAY, ST7735_BLACK);
+      }
+
+      // Dibujar opción seleccionada (sobre la barra blanca ya existente)
+      String selectedText = String(menuItems[mainMenuSelection]);    
+      // Calculate centered positions for selected item
+      int selectedIconX = 35; // Center of screen
+      int selectedTextX = 55; // Icon center + icon width/2 + spacing
+      switch (mainMenuSelection) {
+        case 0: // GPS
+          selectedTextX = 70;
+          selectedIconX = 50;
+          break;
+        case 1: // Musica
+          selectedTextX = 55;
+          selectedIconX = 35;
+          break;
+        case 2: // Monitoreo
+          selectedTextX = 40;
+          selectedIconX = 20;
+          break;
+        case 3: // Info
+          selectedTextX = 65;
+          selectedIconX = 45;
+          break;
+        case 4: // Ejercicio
+          selectedTextX = 30;
+          selectedIconX = 50;
+          break;
+        case 5: // Emergencia
+          selectedTextX = 23;
+          selectedIconX = 43;
+          break;
+      }
+      
+      // Icon for selected (on white bg) - centered
+      drawMenuIcon(selectedIconX, 34, mainMenuSelection, true, ST7735_WHITE);
+      write_str_bold(selectedTextX, 38, selectedText.c_str(), Font_11x18, ST7735_BLACK, ST7735_WHITE);
+
+      // Dibujar opción de abajo (si existe)
+      if (mainMenuSelection < 5) {
+        int belowIdx = mainMenuSelection + 1;
+        String belowText = String(menuItems[belowIdx]);
+        // Calculate centered positions
+        int belowIconX = 35; // Center of screen
+        int belowTextX = 55; // Icon center + icon width/2 + spacing
+        switch (belowIdx) {
+          case 1: // Musica
+            belowTextX = 68;
+            belowIconX = 48;
+            break;
+          case 2: // Monitoreo
+            belowTextX = 57;
+            belowIconX = 37;
+            break;
+          case 3: // Info
+            belowTextX = 73;
+            belowIconX = 53;
+            break;
+          case 4: // Ejercicio
+            belowTextX = 53;
+            belowIconX = 33;
+            break;
+          case 5: // Emergencia
+            belowTextX = 50;
+            belowIconX = 30;
+            break;
+        }
+        
+        // Icon for below (on black bg) - centered
+        drawMenuIcon(belowIconX, 61, belowIdx, false, ST7735_BLACK);
+        st7735.st7735_write_str(belowTextX, 65, belowText.c_str(), Font_7x10, ST7735_GRAY, ST7735_BLACK);
+      }
+
+      lastMainMenuIdx = mainMenuSelection;
+    }
+  }
+}
+
+
 
 void drawMenuDots(MenuScreen currentMenu) {
   const int dotRadius = 1;
