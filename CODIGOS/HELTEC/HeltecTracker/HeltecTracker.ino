@@ -20,6 +20,7 @@
 void setup() {
   Serial.begin(115200);
   delay(1000);
+
   //Inicio de subsistemas
   botones.init();
   detectorCaida.init();
@@ -33,8 +34,10 @@ void setup() {
 void loop() {
   const unsigned long currentTime = millis();
 
+  botones.checkUserEntry();
+
   // Botones
-  processButtonPress();
+  //processButtonPress();
 
   // Pantallas según menú
   if (currentScreen == SCREEN_MAIN_MENU) {

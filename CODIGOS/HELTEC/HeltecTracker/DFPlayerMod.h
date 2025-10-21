@@ -14,6 +14,10 @@ class Musica {
     public:
         Musica();
         void init();
+        void volumeUp();
+        void volumeDown();
+
+        unsigned long lastVolumeUpdateTime; 
 };
 
 
