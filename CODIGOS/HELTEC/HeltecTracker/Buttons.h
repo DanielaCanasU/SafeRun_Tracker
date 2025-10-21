@@ -6,10 +6,20 @@
 class Botones {
     private:  
       int pin;
+      bool comboPressed = false;
+      unsigned long comboStart = 0;
+      unsigned long comboActivatedTime = 0;
+      bool comboJustActivated = false;
+      bool left;
+      bool right;
+      bool sel;
+      unsigned long currentTime;
 
     public:
         Botones();
         void init();
+        void checkUserEntry();
+        void checkEmergencyCombo();
 };
 
 void initButtonsState();

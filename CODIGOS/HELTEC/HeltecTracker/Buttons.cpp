@@ -29,6 +29,81 @@ void Botones::init(){
   Serial.println("--------------------------------");
 }
 
+void Botones::checkUserEntry(){
+  currentTime = millis();
+
+  left = leftButton.isPressed; 
+  right = rightButton.isPressed; 
+  sel = selectButton.isPressed;
+  // Si el combo se acaba de activar, esperar un período de gracia antes de procesar otros botones
+  if (comboJustActivated && (currentTime - comboActivatedTime >= 2000) && !left && !right && !sel) { // 1 segundo de gracia
+    comboJustActivated = false;
+  }
+  
+  // Si estamos en período de gracia después del combo, no procesar otros botones
+  if (comboJustActivated) {
+    return;
+  }
+  this->checkEmergencyCombo();
+
+  if (!needProcessButton && !left && !right) return; //Si no hay entrada del usuario nos retiramos por donde vinimos
+
+  if (currentScreen == SCREEN_MP3_PLAYER) {
+    if (left && (currentTime - leftButton.pressStartTime >= LONG_PRESS_TIME)) {
+      if (currentTime - musica.lastVolumeUpdateTime >= VOLUME_UPDATE_INTERVAL) {
+        musica.volumeDown();
+        musica.lastVolumeUpdateTime = currentTime;
+      }
+      return;
+    }
+    if (right && (currentTime - rightButton.pressStartTime >= LONG_PRESS_TIME)) {
+      if (currentTime - musica.lastVolumeUpdateTime >= VOLUME_UPDATE_INTERVAL) {
+        musica.volumeUp();
+        musica.lastVolumeUpdateTime = currentTime;
+      }
+      return;
+    }
+  }
+
+  if (!needProcessButton || leftButton.isPressed || rightButton.isPressed || selectButton.isPressed) return;
+  ButtonState* activeButton = nullptr; uint8_t buttonType = 0;
+  if (leftButton.lastPressTime > rightButton.lastPressTime && leftButton.lastPressTime > selectButton.lastPressTime) { activeButton = &leftButton; buttonType = BUTTON_LEFT; }
+  else if (rightButton.lastPressTime > leftButton.lastPressTime && rightButton.lastPressTime > selectButton.lastPressTime) { activeButton = &rightButton; buttonType = BUTTON_RIGHT; }
+  else if (selectButton.lastPressTime > leftButton.lastPressTime && selectButton.lastPressTime > rightButton.lastPressTime) { activeButton = &selectButton; buttonType = BUTTON_SELECT; }
+  if (activeButton != nullptr) {
+    if ((currentTime - activeButton->lastClickTime >= CLICK_TIMEOUT) || activeButton->clickCount >= 3) {
+      if (activeButton->wasLongPress) handleButtonPress(buttonType, true, false, false);
+      else { bool isDoubleClick = (activeButton->clickCount == 2); bool isTripleClick = (activeButton->clickCount == 3); handleButtonPress(buttonType, false, isDoubleClick, isTripleClick); }
+      activeButton->clickCount = 0; needProcessButton = false;
+    }
+  }
+
+}
+
+void Botones::checkEmergencyCombo() {
+  if (left && right && sel) {
+    if (!comboPressed) {
+      comboPressed = true; 
+      comboStart = currentTime; 
+    }
+    else if (currentTime - comboStart >= 3000) {
+      if (!emergencia) {
+        emergencia = true; 
+        emergencyConfirmDeactivate = false;
+      } else {
+        emergencyConfirmDeactivate = true;
+      }
+      currentScreen = SCREEN_EMERGENCY;
+      drawEmergencyScreen(true);
+      comboPressed = false;
+      comboJustActivated = true; // Marcar que el combo se acaba de activar
+      comboActivatedTime = currentTime; // Guardar el tiempo de activación
+      return; // Salir para evitar procesar otros botones
+    }
+  } else {
+    comboPressed = false;
+  }
+}
 
 void IRAM_ATTR handleLeftInterrupt() {
   unsigned long currentTime = millis();
@@ -100,17 +175,17 @@ void IRAM_ATTR handleSelectInterrupt() {
 
 void processButtonPress() {
   unsigned long currentTime = millis();
-  
+  /*
   // Detección global de combo 3 botones (izq+der+select): mantener 3s
   static bool comboPressed = false; 
   static unsigned long comboStart = 0;
   static unsigned long comboActivatedTime = 0; // Tiempo cuando se activó el combo
   static bool comboJustActivated = false; // Flag para indicar que el combo se acaba de activar
-  
+  */
   bool left = leftButton.isPressed; 
   bool right = rightButton.isPressed; 
   bool sel = selectButton.isPressed;
-  
+  /*
   // Si el combo se acaba de activar, esperar un período de gracia antes de procesar otros botones
   if (comboJustActivated && (currentTime - comboActivatedTime >= 2000) && !left && !right && !sel) { // 1 segundo de gracia
     comboJustActivated = false;
@@ -143,7 +218,8 @@ void processButtonPress() {
   } else {
     comboPressed = false;
   }
-  
+  */
+  /*
   if (!needProcessButton && !leftButton.isPressed && !rightButton.isPressed) return;
   
   if (currentScreen == SCREEN_MP3_PLAYER) {
@@ -162,6 +238,7 @@ void processButtonPress() {
       return;
     }
   }
+  */
   if (!needProcessButton || leftButton.isPressed || rightButton.isPressed || selectButton.isPressed) return;
   ButtonState* activeButton = nullptr; uint8_t buttonType = 0;
   if (leftButton.lastPressTime > rightButton.lastPressTime && leftButton.lastPressTime > selectButton.lastPressTime) { activeButton = &leftButton; buttonType = BUTTON_LEFT; }
