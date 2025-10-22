@@ -21,11 +21,7 @@ void LoRa::init(){
       delay(1000);
     } else {
       Serial.println("--------------------------------");
-      Serial.println("--------------------------------");
-      Serial.println("--------------------------------");
       Serial.println("ERROR INICIANDO LORA");
-      Serial.println("--------------------------------");
-      Serial.println("--------------------------------");
       Serial.println("--------------------------------");
     }
     LT.setMode(MODE_STDBY_RC);

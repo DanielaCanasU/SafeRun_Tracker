@@ -1,5 +1,6 @@
 #include "Display.h"
 #include "GPS.h"
+#include "Accel.h"
 
 Display::Display(){
 
@@ -478,16 +479,16 @@ void drawMonitoringScreen() {
   int y_offset = 15;
   int current_y = 15;
   st7735.st7735_write_str(0, current_y, "Impacto:", Font_7x10, ST7735_WHITE);
-  st7735.st7735_write_str(70, current_y, impacto ? "SI" : "NO", Font_7x10, impacto ? ST7735_GREEN : ST7735_RED);
+  st7735.st7735_write_str(70, current_y, detectorCaida.impacto ? "SI" : "NO", Font_7x10, detectorCaida.impacto ? ST7735_GREEN : ST7735_RED);
   current_y += y_offset;
   st7735.st7735_write_str(0, current_y, "CaidaLibre:", Font_7x10, ST7735_WHITE);
-  st7735.st7735_write_str(70, current_y, free_fall ? "SI" : "NO", Font_7x10, free_fall ? ST7735_GREEN : ST7735_RED);
+  st7735.st7735_write_str(70, current_y, detectorCaida.free_fall ? "SI" : "NO", Font_7x10, detectorCaida.free_fall ? ST7735_GREEN : ST7735_RED);
   current_y += y_offset;
   st7735.st7735_write_str(0, current_y, "CaidaConf:", Font_7x10, ST7735_WHITE);
-  st7735.st7735_write_str(70, current_y, segunda_condicion_caida ? "SI" : "NO", Font_7x10, segunda_condicion_caida ? ST7735_GREEN : ST7735_RED);
+  st7735.st7735_write_str(70, current_y, detectorCaida.segunda_condicion_caida ? "SI" : "NO", Font_7x10, detectorCaida.segunda_condicion_caida ? ST7735_GREEN : ST7735_RED);
   current_y += y_offset;
   st7735.st7735_write_str(0, current_y, "Emergencia:", Font_7x10, ST7735_WHITE);
-  st7735.st7735_write_str(70, current_y, emergencia ? "SI" : "NO", Font_7x10, emergencia ? ST7735_GREEN : ST7735_RED);
+  st7735.st7735_write_str(70, current_y, detectorCaida.emergencia ? "SI" : "NO", Font_7x10, detectorCaida.emergencia ? ST7735_GREEN : ST7735_RED);
   drawMenuDots(SCREEN_MONITORING);
 }
 
@@ -552,7 +553,7 @@ void drawEmergencyScreen(bool firstDraw) {
     st7735.st7735_write_str(45, 5, "EMERGENCIA", Font_7x10, ST7735_WHITE);
     
   }
-  if (!emergencia) {
+  if (!detectorCaida.emergencia) {
     drawRoundedRectangle(22, 20, 115, 30, 4, ST7735_GREEN);
     st7735.st7735_write_str(40, 28, "A SALVO", Font_11x18, ST7735_BLACK, ST7735_GREEN);
     st7735.st7735_write_str(5, 60, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);

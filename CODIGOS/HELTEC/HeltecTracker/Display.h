@@ -13,7 +13,6 @@ class Display {
         void drawMenu(MenuScreen currentMenu, bool firstDraw = true);
 };
 
-void displayInit();
 void drawMenuDots(MenuScreen currentMenu);
 void drawMainMenu();
 void drawGPSScreen(bool firstDraw = true, bool updateLatitude = false, bool updateLongitude = false);

@@ -46,11 +46,11 @@ unsigned long lastGPSUpdate = 0;
 float x = 0, y = 0, z = 0;
 float time_dato = 0;
 unsigned long lastReadTime_Acelerometro = 0;
-bool free_fall = false, segunda_condicion_caida = false, emergencia = false, impacto = false;
-unsigned long time_of_fall = 0, tiempo_de_choque_piso = 0, tiempoimpacto = 0;
+//bool free_fall = false, segunda_condicion_caida = false, emergencia = false, impacto = false;
+//unsigned long time_of_fall = 0, tiempo_de_choque_piso = 0, tiempoimpacto = 0;
 unsigned long ventana_caida_a_choque = 500;
 unsigned long ventana_choque_a_inactividad = 7000;
-float initialX = 0, initialY = 0, initialZ = 0;
+//float initialX = 0, initialY = 0, initialZ = 0;
 bool isCalibrated = false, isMonitoringActive = false;
 bool prev_impacto = false, prev_free_fall = false, prev_segunda_condicion_caida = false, prev_emergencia = false;
 
