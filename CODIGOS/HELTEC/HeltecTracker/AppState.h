@@ -75,10 +75,10 @@ extern unsigned long lastGPSUpdate;
 extern float x, y, z;
 extern float time_dato;
 extern unsigned long lastReadTime_Acelerometro;
-extern bool free_fall, segunda_condicion_caida, emergencia, impacto;
+//extern bool free_fall, segunda_condicion_caida, emergencia, impacto;
 extern unsigned long time_of_fall, tiempo_de_choque_piso, tiempoimpacto;
 extern unsigned long ventana_caida_a_choque, ventana_choque_a_inactividad;
-extern float initialX, initialY, initialZ;
+//extern float initialX, initialY, initialZ;
 extern bool isCalibrated, isMonitoringActive;
 extern bool prev_impacto, prev_free_fall, prev_segunda_condicion_caida, prev_emergencia;
 

@@ -20,6 +20,7 @@ class Botones {
         void init();
         void checkUserEntry();
         void checkEmergencyCombo();
+        void handleUserGestures(uint8_t button, bool isLongPress, bool isDoubleClick, bool isTripleClick);
 };
 
 void initButtonsState();

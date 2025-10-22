@@ -71,7 +71,55 @@ void DetectorCaida::checkConfig() {
   Serial.println(" g");
 }
 
+void DetectorCaida::checkStatus(){
+  if (isMonitoringActive) {  //Monitorear detector de caida solo si se está haciendo ejercicio
+    if (!isCalibrated) { //Calibrar al momento de iniciar actividad fisica
+      this->calibrateStandingPosition();
+      free_fall = false; segunda_condicion_caida = false; emergencia = false; isCalibrated = true; impacto = false; //Condiciones iniciales 
+      prev_impacto = impacto; prev_free_fall = free_fall; prev_segunda_condicion_caida = segunda_condicion_caida; prev_emergencia = emergencia;
+      if (currentScreen == SCREEN_MONITORING) drawMonitoringScreen();
+    } else if (millis() - lastReadTime_Acelerometro >= timerDelay_Acelerometro) { //Leer el acelerometro de manera periodica
+      lastReadTime_Acelerometro = millis();
+      Activites activ = acelerometro.readActivites(); 
+      if (impacto) tiempoimpacto = millis();
+      if ((millis() - time_of_fall >= ventana_caida_a_choque) && (free_fall)) { impacto = false; tiempoimpacto = 0; } //Limpiar si pasó mucho tiempo desde la caida libre y no hubo impacto
+      if (activ.isFreeFall) { Serial.println("Free Fall Detected!"); free_fall = true; time_of_fall = millis(); } //Caida libre detectada
+      if ((millis() - time_of_fall >= ventana_caida_a_choque) && (free_fall)) { free_fall = false; time_of_fall = 0; } //Esto se puede agregar arriba
+      if (activ.isActivity && free_fall) { segunda_condicion_caida = true; tiempo_de_choque_piso = millis(); } //Impacto despues de la caida libre
+      if (activ.isActivity && impacto) { segunda_condicion_caida = true; tiempo_de_choque_piso = millis(); } //Esto se podria quitar
+      if ((millis() - tiempo_de_choque_piso >= ventana_choque_a_inactividad) && (segunda_condicion_caida)) { segunda_condicion_caida = false; tiempo_de_choque_piso = 0; } //Si ya pasó mucho tiempo no hubo inactividad despues de choque
+      if ((activ.isInactivity && segunda_condicion_caida && !isPersonStanding()) || (activ.isInactivity && impacto && !isPersonStanding())) { emergencia = true; } //Si se realizaron las 3 condiciones, emergencia 
+      sensors_event_t event; acelerometro.getEvent(&event); x = event.acceleration.x; y = event.acceleration.y; z = event.acceleration.z; time_dato += 0.025;
+      readAcelerometroData();
+      bool stateChanged = (impacto != prev_impacto || free_fall != prev_free_fall || segunda_condicion_caida != prev_segunda_condicion_caida || emergencia != prev_emergencia);
+      if (stateChanged) {
+        if (currentScreen == SCREEN_MONITORING) drawMonitoringScreen();
+        prev_impacto = impacto; prev_free_fall = free_fall; prev_segunda_condicion_caida = segunda_condicion_caida; prev_emergencia = emergencia;
+      }
+    }
+  } else {
+    bool actual_state_changed_to_false = false;
+    if (impacto) { impacto = false; actual_state_changed_to_false = true; }
+    if (free_fall) { free_fall = false; actual_state_changed_to_false = true; }
+    if (segunda_condicion_caida) { segunda_condicion_caida = false; actual_state_changed_to_false = true; }
+    //if (emergencia) { emergencia = false; actual_state_changed_to_false = true; }
+    if (isCalibrated) { isCalibrated = false; }
+    bool prev_states_need_sync = (prev_impacto != impacto || prev_free_fall != free_fall || prev_segunda_condicion_caida != segunda_condicion_caida || prev_emergencia != emergencia);
+    if (actual_state_changed_to_false || prev_states_need_sync) {
+      prev_impacto = impacto; prev_free_fall = free_fall; prev_segunda_condicion_caida = segunda_condicion_caida; prev_emergencia = emergencia;
+      if (currentScreen == SCREEN_MONITORING) drawMonitoringScreen();
+    }
+  }
+}
 
+void DetectorCaida::calibrateStandingPosition(){
+  sensors_event_t event; acelerometro.getEvent(&event); //Leer acelerometro
+  initialX = event.acceleration.x; initialY = event.acceleration.y; initialZ = event.acceleration.z;
+  isCalibrated = true; Serial.println("Calibración completada. Condiciones iniciales guardadas:");
+  Serial.print("X: "); Serial.println(initialX);
+  Serial.print("Y: "); Serial.println(initialY);
+  Serial.print("Z: "); Serial.println(initialZ);
+}
 
 float getCalibracionAcelerometro(char eje) {
   float numReadings = 500;
@@ -84,6 +132,17 @@ float getCalibracionAcelerometro(char eje) {
   return 0;
 }
 
+void DetectorCaida::readAcelerometroData() {
+  float magnitud = calcularMagnitud(x, y, z);
+  if (magnitud >= 14) { impacto = true; Serial.println("¡Impacto detectado!"); Serial.print("Magnitud: "); Serial.println(magnitud); }
+  else { impacto = false; }
+  if (free_fall) Serial.println("¡Alerta! Caida.");
+  if (impacto) Serial.println("¡Alerta! Impacto.");
+  if (segunda_condicion_caida) Serial.println("¡Alerta! Caida segundo.");
+  if (emergencia) Serial.println("¡Alerta! EMERGENCIA");
+}
+
+/*
 void readAcelerometroData() {
   float magnitud = calcularMagnitud(x, y, z);
   if (magnitud >= 14) { impacto = true; Serial.println("¡Impacto detectado!"); Serial.print("Magnitud: "); Serial.println(magnitud); }
@@ -102,8 +161,9 @@ void calibrateStandingPosition() {
   Serial.print("Y: "); Serial.println(initialY);
   Serial.print("Z: "); Serial.println(initialZ);
 }
+*/
 
-bool isPersonStanding() {
+bool DetectorCaida::isPersonStanding() {
   if (!isCalibrated) { Serial.println("Error: No se ha realizado la calibración."); return false; }
   sensors_event_t event; acelerometro.getEvent(&event);
   float deltaX = abs(event.acceleration.x - initialX);
@@ -118,6 +178,7 @@ bool isPersonStanding() {
 
 float calcularMagnitud(float x_, float y_, float z_) { return sqrt(x_ * x_ + y_ * y_ + z_ * z_); }
 
+/*
 void accelLoop() {
   if (isMonitoringActive) {
     if (!isCalibrated) {
@@ -158,5 +219,5 @@ void accelLoop() {
     }
   }
 }
-
+*/
 

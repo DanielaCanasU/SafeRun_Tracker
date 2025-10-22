@@ -34,11 +34,10 @@ void setup() {
 void loop() {
   const unsigned long currentTime = millis();
 
+  //Manejar si el usuario utilizó algún botón
   botones.checkUserEntry();
 
-  // Botones
-  //processButtonPress();
-
+  
   // Pantallas según menú
   if (currentScreen == SCREEN_MAIN_MENU) {
     // El menú principal no necesita actualizaciones constantes
@@ -57,9 +56,9 @@ void loop() {
     handleExerciseScreen();
   }
 
-
+  detectorCaida.checkStatus();
   // Monitoreo acelerómetro
-  accelLoop();
+  //accelLoop();
 
   // GPS feed
   getGpsData();
@@ -74,32 +73,32 @@ void loop() {
       len = snprintf(message, sizeof(message),
                      "GPS:%s,%s; ST:%d,%d,%d,%d,%d; ACC:%.2f,%.2f,%.2f",
                      latitude.c_str(), longitude.c_str(),
-                     1, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0,
+                     1, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0,
                      x, y, z);
 #else
       len = snprintf(message, sizeof(message),
                      "GPS:%s,%s; ST:%d,%d,%d,%d,%d",
                      latitude.c_str(), longitude.c_str(),
-                     1, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0);
+                     1, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0);
 #endif
     } else {
 #ifdef ENVIAR_ACELEROMETRO
       len = snprintf(message, sizeof(message),
                      "ST:%d,%d,%d,%d,%d; ACC:%.2f,%.2f,%.2f",
-                     0, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0,
+                     0, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0,
                      x, y, z);
 #else
       len = snprintf(message, sizeof(message),
                      "ST:%d,%d,%d,%d,%d",
-                     0, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0);
+                     0, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0);
 #endif
     }
     if (len > 0 && len < (int)sizeof(message) - 1) {
