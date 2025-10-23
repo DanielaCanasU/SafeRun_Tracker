@@ -82,11 +82,9 @@ void DetectorCaida::checkStatus(){
       lastReadTime_Acelerometro = millis();
       Activites activ = acelerometro.readActivites(); 
       if (impacto) tiempoimpacto = millis();
-      if ((millis() - time_of_fall >= ventana_caida_a_choque) && (free_fall)) { impacto = false; tiempoimpacto = 0; } //Limpiar si pasó mucho tiempo desde la caida libre y no hubo impacto
+      if ((millis() - time_of_fall >= ventana_caida_a_choque) && (free_fall)) { impacto = false; tiempoimpacto = 0; free_fall = false; time_of_fall = 0; } //Limpiar si pasó mucho tiempo desde la caida libre y no hubo impacto
       if (activ.isFreeFall) { Serial.println("Free Fall Detected!"); free_fall = true; time_of_fall = millis(); } //Caida libre detectada
-      if ((millis() - time_of_fall >= ventana_caida_a_choque) && (free_fall)) { free_fall = false; time_of_fall = 0; } //Esto se puede agregar arriba
-      if (activ.isActivity && free_fall) { segunda_condicion_caida = true; tiempo_de_choque_piso = millis(); } //Impacto despues de la caida libre
-      if (activ.isActivity && impacto) { segunda_condicion_caida = true; tiempo_de_choque_piso = millis(); } //Esto se podria quitar
+      if (activ.isActivity && free_fall ||activ.isActivity && impacto) { segunda_condicion_caida = true; tiempo_de_choque_piso = millis(); } //Impacto despues de la caida libre o impacto antes de la caida libre
       if ((millis() - tiempo_de_choque_piso >= ventana_choque_a_inactividad) && (segunda_condicion_caida)) { segunda_condicion_caida = false; tiempo_de_choque_piso = 0; } //Si ya pasó mucho tiempo no hubo inactividad despues de choque
       if ((activ.isInactivity && segunda_condicion_caida && !isPersonStanding()) || (activ.isInactivity && impacto && !isPersonStanding())) { emergencia = true; } //Si se realizaron las 3 condiciones, emergencia 
       sensors_event_t event; acelerometro.getEvent(&event); x = event.acceleration.x; y = event.acceleration.y; z = event.acceleration.z; time_dato += 0.025;
@@ -102,7 +100,6 @@ void DetectorCaida::checkStatus(){
     if (impacto) { impacto = false; actual_state_changed_to_false = true; }
     if (free_fall) { free_fall = false; actual_state_changed_to_false = true; }
     if (segunda_condicion_caida) { segunda_condicion_caida = false; actual_state_changed_to_false = true; }
-    //if (emergencia) { emergencia = false; actual_state_changed_to_false = true; }
     if (isCalibrated) { isCalibrated = false; }
     bool prev_states_need_sync = (prev_impacto != impacto || prev_free_fall != free_fall || prev_segunda_condicion_caida != segunda_condicion_caida || prev_emergencia != emergencia);
     if (actual_state_changed_to_false || prev_states_need_sync) {
