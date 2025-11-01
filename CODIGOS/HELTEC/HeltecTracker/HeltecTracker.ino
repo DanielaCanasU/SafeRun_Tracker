@@ -27,7 +27,7 @@ void setup() {
   display.init();
   loRa.init();
   geolocation.init();
-  //musica.init();
+  musica.init();
   analogReadResolution(12);
 }
 
