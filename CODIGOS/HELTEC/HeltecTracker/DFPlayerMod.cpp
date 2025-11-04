@@ -19,17 +19,7 @@ void Musica::init(){
     Serial.println("ERROR INICIANDO REPRODUCTOR");
     Serial.println("--------------------------------");
   }
-  dfPlayer.setTimeOut(500);
-  dfPlayer.volume(20);
-  dfPlayer.EQ(DFPLAYER_EQ_NORMAL);
-  dfPlayer.outputDevice(DFPLAYER_DEVICE_SD);
-  lista_canciones.clear();
-  for (int i = 1; i <= 255; i++) {
-    int count = dfPlayer.readFileCountsInFolder(i); delay(500);
-    if (count > 0) lista_canciones.push_back(count);
-    else if (count == 0) break;
-  }
-  maxFolders = lista_canciones.size();
+  
   Serial.println("--------------------------------");
   Serial.println("REPRODUCTOR INICIADO CORRECTAMENTE");
   Serial.println("--------------------------------");
