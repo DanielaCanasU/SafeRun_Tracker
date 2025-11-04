@@ -1,6 +1,10 @@
 #include "Display.h"
 #include "GPS.h"
 #include "Accel.h"
+#include "DFPlayerMod.h"
+#include <SoftwareSerial.h> 
+#include <HardwareSerial.h> //Puerto Serial
+#include "AppState.h"
 
 Display::Display(){
 
@@ -314,6 +318,17 @@ void drawMainMenu() {
 }
 
 void drawFolderScreen(bool firstDraw) {
+  dfPlayer.setTimeOut(500);
+  dfPlayer.volume(20);
+  dfPlayer.EQ(DFPLAYER_EQ_NORMAL);
+  dfPlayer.outputDevice(DFPLAYER_DEVICE_SD);
+  lista_canciones.clear();
+  for (int i = 1; i <= 255; i++) {
+    int count = dfPlayer.readFileCountsInFolder(i); delay(500);
+    if (count > 0) lista_canciones.push_back(count);
+    else if (count == 0) break;
+  }
+  maxFolders = lista_canciones.size();
   static int lastFolderLocal = 0;
   if (firstDraw) {
     st7735.st7735_fill_screen(ST7735_BLACK);
@@ -417,6 +432,7 @@ void drawMP3Screen(bool firstDraw) {
   int volBaseY = baseYcontrols + 33;
 
   if (firstDraw) {
+    
     st7735.st7735_fill_screen(ST7735_BLACK);
     lastVolume = 255;
     lastOption = MP3_OPTION_COUNT;
