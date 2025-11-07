@@ -55,7 +55,7 @@ void loop() {
     handleExerciseScreen();
   }
 
-  //detectorCaida.checkStatus();
+  detectorCaida.checkStatus();
   
   
   // Monitoreo acelerómetro
