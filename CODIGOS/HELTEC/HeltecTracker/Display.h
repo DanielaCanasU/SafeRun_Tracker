@@ -11,6 +11,7 @@ class Display {
         Display();
         void init();
         void drawMenu(MenuScreen currentMenu, bool firstDraw = true);
+        void drawStaticWelcome();  // Añadir declaración del método
 };
 
 void drawMenuDots(MenuScreen currentMenu);
@@ -48,4 +49,3 @@ void drawNextIcon(uint16_t x, uint16_t y, uint16_t color);
 void drawVolDownIcon(uint16_t x, uint16_t y, uint16_t color);
 void drawVolUpIcon(uint16_t x, uint16_t y, uint16_t color);
 void drawRoundedRectangle(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t radius, uint16_t color);
-

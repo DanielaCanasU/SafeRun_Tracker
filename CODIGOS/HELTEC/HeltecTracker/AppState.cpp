@@ -29,7 +29,11 @@ Display display;
 std::vector<int> lista_canciones;
 float batteryVoltage = 0.0f;
 int batteryPercent = 0;
-
+// Nuevo flag para indicar que el DFPlayer está listo
+extern bool GPSLISTO;
+bool GPSLISTO = false;
+extern bool firstplay;
+bool firstplay = false;
 bool TRANSMISION_COMPLETADA = true;
 bool TRANSMISION_FALLIDA = false;
 
@@ -85,5 +89,3 @@ float lastExerciseLon = 0.0f;
 
 //bool emergencyActiveUI = false;
 bool emergencyConfirmDeactivate = false;
-
-

@@ -3,6 +3,7 @@
 #include <DFRobotDFPlayerMini.h>
 #include "AppState.h"
 #include "Pins.h"
+#include <SoftwareSerial.h> // <-- usar SoftwareSerial
 
 void configureDFPlayer();
 void playSound(uint8_t folder, uint8_t file);
@@ -20,4 +21,5 @@ class Musica {
         unsigned long lastVolumeUpdateTime; 
 };
 
-
+// declarar el objeto serial usado por el DFPlayer (definido en DFPlayerMod.cpp)
+extern SoftwareSerial DFPlayerSerial;

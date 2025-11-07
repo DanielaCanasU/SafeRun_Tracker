@@ -23,11 +23,10 @@ void setup() {
 
   //Inicio de subsistemas
   botones.init();
-  detectorCaida.init();
-  display.init();
-  loRa.init();
+  display.init(); //Bienvenida
   geolocation.init();
-  musica.init();
+  //loRa.init();
+  //detectorCaida.init();
   analogReadResolution(12);
 }
 
@@ -56,13 +55,15 @@ void loop() {
     handleExerciseScreen();
   }
 
-  detectorCaida.checkStatus();
+  //detectorCaida.checkStatus();
+  
+  
   // Monitoreo acelerómetro
   //accelLoop();
 
   // GPS feed
   getGpsData();
-
+  /*
   // Envío periódico por LoRa (siempre). El contenido incluye GPS solo cuando isMonitoringActive == true
   if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa)) {
     lastSendTime_LoRa = currentTime;
@@ -106,7 +107,7 @@ void loop() {
       message[len + 1] = '\0';
     }
     sendMessage(message, true);
-  }
+  }*/
 
   // Batería
   batteryVoltage = readBatteryVoltage();
