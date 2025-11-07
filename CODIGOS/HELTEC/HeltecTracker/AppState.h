@@ -50,7 +50,6 @@ extern Display display;
 extern Geolocation geolocation;
 extern LoRa loRa;
 
-
 // Estado global
 extern std::vector<int> lista_canciones;
 extern float batteryVoltage;
@@ -115,4 +114,5 @@ extern float lastExerciseLon;
 //extern bool emergencyActiveUI;
 extern bool emergencyConfirmDeactivate;
 
-
+extern bool GPSLISTO;  // Flag para indicar si el DFPlayer está listo
+extern bool firstplay;
