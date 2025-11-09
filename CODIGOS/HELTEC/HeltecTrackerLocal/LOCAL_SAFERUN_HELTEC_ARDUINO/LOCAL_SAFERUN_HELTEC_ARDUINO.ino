@@ -223,11 +223,6 @@ void loop() {
         Serial.println("Debug");
     }
         
-    // In local mode, optionally draw quick status onto display
-    if (!isRemoteModeSelected()) {
-        renderInfoLoRa(currentData);
-    }
-    
     // Small delay to prevent watchdog issues
     delay(10);
 }
