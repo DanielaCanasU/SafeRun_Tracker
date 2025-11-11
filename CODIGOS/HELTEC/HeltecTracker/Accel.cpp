@@ -131,7 +131,7 @@ float getCalibracionAcelerometro(char eje) {
 
 void DetectorCaida::readAcelerometroData() {
   float magnitud = calcularMagnitud(x, y, z);
-  if (magnitud >= 14) { impacto = true; Serial.println("¡Impacto detectado!"); Serial.print("Magnitud: "); Serial.println(magnitud); }
+  if (magnitud >= 28) { impacto = true; Serial.println("¡Impacto detectado!"); Serial.print("Magnitud: "); Serial.println(magnitud); }
   else { impacto = false; }
   if (free_fall) Serial.println("¡Alerta! Caida.");
   if (impacto) Serial.println("¡Alerta! Impacto.");

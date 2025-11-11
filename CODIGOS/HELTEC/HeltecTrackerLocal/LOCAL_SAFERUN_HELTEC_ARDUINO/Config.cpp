@@ -46,7 +46,7 @@ const size_t MIN_FREE_HEAP = 15000;      // Mínimo 15KB de memoria libre
 const size_t CRITICAL_HEAP = 8000;       // 8KB crítico - posible reinicio
 
 // default remote mode is true (Firebase)
-static bool remoteMode = true;
+static bool remoteMode = false;
 
 void initConfig() {
   // Nothing yet; placeholder for future board-specific init

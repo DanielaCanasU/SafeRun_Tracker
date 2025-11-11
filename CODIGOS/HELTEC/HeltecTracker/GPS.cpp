@@ -37,7 +37,7 @@ void Geolocation::init(){
       Serial.printf("LAT: %.6f\n", gps.location.lat());
       Serial.printf("LON: %.6f\n", gps.location.lng());
       Serial.printf("Satélites: %d\n", gps.satellites.value());
-      return;
+      //return;
     }
 
     // Feedback visual cada 500ms
@@ -51,7 +51,8 @@ void Geolocation::init(){
   GPSLISTO = true;
   
   // Transición automática: dibujar menú principal completo
-  display.drawMenu(SCREEN_MAIN_MENU, true);
+  //display.drawMenu(SCREEN_MAIN_MENU, true);
+
 }
 
 

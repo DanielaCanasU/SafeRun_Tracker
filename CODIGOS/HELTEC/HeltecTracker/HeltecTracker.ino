@@ -25,6 +25,8 @@ void setup() {
   botones.init();
   display.init(); //Bienvenida
   geolocation.init();
+  display.drawMenu(SCREEN_MAIN_MENU, true);
+
   loRa.init();
   detectorCaida.init();
   analogReadResolution(12);

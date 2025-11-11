@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "SensorData.h" // Necesario para el tipo SensorData
 
+extern bool manualWifi;
 // Funciones principales de la UI
 void initUI();
 void updateUI(unsigned long now);
