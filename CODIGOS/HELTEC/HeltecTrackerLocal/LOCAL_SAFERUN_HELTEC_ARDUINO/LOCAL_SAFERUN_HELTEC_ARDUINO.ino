@@ -14,6 +14,8 @@
 #include "AppState.h"
 #include "Utils.h"
 #include "GPS.h"
+#include "DataLogger.h"
+#include "DataWebServer.h"
 
 // Define the global display object
 HT_st7735 st7735;
@@ -89,6 +91,36 @@ void setup() {
     configureGPS();
     //yield();
     
+    // Initialize DataLogger
+    // Eliminado: if (!initDataLogger()) ...
+    // No es necesario inicializar logger en RAM
+    
+    // Connect to WiFi
+    Serial.println("Connecting to WiFi...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    
+    int wifiAttempts = 0;
+    while (WiFi.status() != WL_CONNECTED && wifiAttempts < 30) {
+        delay(500);
+        Serial.print(".");
+        wifiAttempts++;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("");
+        Serial.println("WiFi connected!");
+        Serial.print("IP address: ");
+        Serial.println(WiFi.localIP());
+        manualWifi = true;
+        
+        // Initialize Web Server
+        initDataWebServer();
+    } else {
+        Serial.println("");
+        Serial.println("WiFi connection failed! Continuing without WiFi...");
+    }
+    
     Serial.println("All systems initialized successfully");
     Serial.println("Device ready for operation");
 }
@@ -127,6 +159,16 @@ void loop() {
                 // Update tracking system with received data
                 updateTrackingData(currentData);
                 
+                // Update last LoRa data for manual save feature
+                updateLastLoRaData(currentData);
+                
+                // Save data automatically when LoRa message is received
+                if (isGPSValid()) {
+                    float localLat = getLatitude();
+                    float localLon = getLongitude();
+                    saveDataRecord(currentData, localLat, localLon, 0); // type 0 = auto
+                }
+                
                 WAITING_LORA = false;
         }   
         lastLoraCheck = now;
@@ -142,6 +184,11 @@ void loop() {
     
     // UI update
     updateUI(now);
+    
+    // Handle web server requests
+    if (WiFi.status() == WL_CONNECTED) {
+        handleDataWebServer();
+    }
 
     // Start Firebase only when in remote mode and WiFi is connected via menu
     static bool firebaseStarted = false;
@@ -176,7 +223,7 @@ void loop() {
     }
     
     // Sync time once WiFi is available and not yet synced
-    if (!timeSynced && WiFi.status() == WL_CONNECTED) {
+    if (!timeSynced && WiFi.status() == WL_CONNECTED && !manualWifi) {
         // Verificar memoria antes de sincronizar tiempo
         if (!isMemoryLow()) {
             setupTime();

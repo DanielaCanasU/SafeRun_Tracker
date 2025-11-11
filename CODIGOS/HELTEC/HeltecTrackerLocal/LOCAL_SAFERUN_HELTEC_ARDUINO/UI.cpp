@@ -26,7 +26,9 @@ static void renderInfoScreen();
 enum class MenuScreen { Welcome, SelectMode, MenuPrincipal, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing, BacktrackMap };
 static MenuScreen currentScreen = MenuScreen::Welcome;
 static bool wifiConnected = false;
+bool manualWifi = false;
 
+//Agregado para pruebas
 // Buttons active LOW
 static bool readBtnUp()   { return digitalRead(BTN_UP_PIN)   == LOW; }
 static bool readBtnDown() { return digitalRead(BTN_DOWN_PIN) == LOW; }
@@ -112,7 +114,7 @@ struct Waypoint {
 };
 
 // Sistema de backtrack
-static const int MAX_WAYPOINTS = 30;
+static const int MAX_WAYPOINTS = 50;
 static Waypoint waypoints[MAX_WAYPOINTS];
 static int waypointCount = 0;
 static int selectedWaypointIndex = -1;
@@ -1849,6 +1851,7 @@ render:
           wifiConnected = true; 
           if (lastRenderedScreen != MenuScreen::WiFiConnecting || lastWifiConnected != true) {
             drawHeaderWithWiFi("Conectado"); 
+            manualWifi = false;
             st7735.st7735_write_str(0, 16, WiFi.localIP().toString().c_str(), Font_7x10, MORADO); 
             drawFooter("OK: volver");
             lastRenderedScreen = MenuScreen::WiFiConnecting;
