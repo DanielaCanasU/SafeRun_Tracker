@@ -1,0 +1,16 @@
+
+# 🔒 Archivos sensibles de Firebase
+CODIGOS/HELTEC/HeltecTracker/notifier_laptop/monitoreodeportistas-firebase-adminsdk-*.json
+
+# Ignorar todas las claves .json (si no quieres subir ninguna)
+*.json
+
+# Archivos y carpetas del entorno local
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
