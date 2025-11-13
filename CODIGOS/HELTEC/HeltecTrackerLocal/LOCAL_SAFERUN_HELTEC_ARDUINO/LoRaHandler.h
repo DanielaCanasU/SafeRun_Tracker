@@ -1,6 +1,8 @@
 #pragma once
 #include "SensorData.h"
 #include <SX126XLT.h>
+#include "AppState.h"
+
 
 // External LoRa object declaration
 extern SX126XLT LT;
@@ -15,3 +17,13 @@ void printPacketStats();
 String getLastPacketString();
 
 
+class LoRa {
+    private:
+        int mensaje;
+        bool WAITING_LORA = false;
+        unsigned long lastLoraCheck = 0;
+    public:
+        LoRa();
+        void init();
+        void checkIncomeMessage();
+};

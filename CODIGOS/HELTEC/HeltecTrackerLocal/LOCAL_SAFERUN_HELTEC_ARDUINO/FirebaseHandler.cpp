@@ -5,6 +5,8 @@
 #include <ArduinoJson.h>
 #include <addons/TokenHelper.h>
 #include <HTTPClient.h>
+#include "SensorData.h"
+#include "AppState.h"
 
 #define SUBIR_ACELEROMETRO
 
@@ -19,13 +21,72 @@ const char* userCorreoSolicitante;
 // FIREBASE HANDLER IMPLEMENTATION
 // =============================================================================
 
-bool initFirebaseHandler() {
-    // Deprecated behavior: do not auto-connect WiFi here anymore.
-    // Object setup is done before begin.
-    // Buffer sizes will be set in startFirebase just before Firebase.begin().
-    return true;
-}
+BaseDatos::BaseDatos(){}
 
+void BaseDatos::checkEnlace(bool open){
+    unsigned long now = millis();
+    if(!open){
+        return;
+    }
+    if (now - lastCheckEnlace >= CHECK_INTERVAL) {
+        lastCheckEnlace = now;
+        if (checkForLinkRequest()) {
+            processLinkRequest();
+        }
+    }
+  }
+  
+bool BaseDatos::checkForLinkRequest(){
+    String documentPath = "linkRequests/" + String(DEVICE_ID);
+    debugPrint("Checking for link request at: " + documentPath);
+    
+    if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str())) {
+        if (fbdo.httpCode() == FIREBASE_ERROR_HTTP_CODE_OK) {
+            debugPrint("Solicitud encontrada: " + fbdo.payload());
+            DynamicJsonDocument doc(2048); // Aumentado para evitar desbordamiento
+            DeserializationError error = deserializeJson(doc, fbdo.payload());
+            userCorreoSolicitante = doc["fields"]["requestedByEmail"]["stringValue"];
+  
+            return true;
+        } else if (fbdo.httpCode() == FIREBASE_ERROR_HTTP_CODE_NOT_FOUND) {
+            debugPrint("No hay solicitud pendiente.");
+            return false;
+        } else {
+            errorPrint("Error al consultar: " + String(fbdo.httpCode()) + " - " + fbdo.errorReason());
+            return false;
+        }
+    } else {
+        errorPrint("Firebase.Firestore.getDocument failed: " + fbdo.errorReason());
+        return false;
+    }
+  }
+
+void BaseDatos::init(){
+    unsigned long now = millis();
+    // Esperar al menos 5 segundos entre intentos de Firebase
+    if (now - lastFirebaseAttempt >= 5000) {
+        lastFirebaseAttempt = now;
+        firebaseAttempts++;
+        
+        // Verificar memoria antes de iniciar Firebase
+        if (!isMemoryLow()) {
+            Serial.printf("Intento %d de iniciar Firebase...\n", firebaseAttempts);
+            // Antes de llamar a startFirebase o Firebase.begin, asegurarse de que no hay Preferences abiertos
+            // (Ya que ahora todos los Preferences se abren/cierra localmente, esto se cumple)
+            firebaseStarted = startFirebase();
+            
+            if (!firebaseStarted && firebaseAttempts >= 3) {
+                Serial.println("Demasiados intentos fallidos de Firebase - deshabilitando");
+                // Deshabilitar Firebase para esta sesión
+                firebaseStarted = true; // Evitar más intentos
+            }
+        } else {
+            Serial.println("Memoria baja - posponiendo inicio de Firebase");
+            forceGarbageCollection();
+            delay(1000);
+        }
+    }
+}
 bool startFirebase() {
     if (WiFi.status() != WL_CONNECTED) {
         errorPrint("WiFi not connected. Cannot start Firebase.");
@@ -127,7 +188,7 @@ bool setupWiFi() {
 
 #define SUBIR_ACELEROMETRO  // Comentar para quitar la subida de acelerómetro
 bool publishAccelDataToFirebase(const SensorData& data) {
-    if (!isFirebaseReady()) {
+    if (!dataBase.isBaseDatosReady()) {
         errorPrint("Firebase not ready");
         return false;
     }
@@ -158,8 +219,40 @@ bool publishAccelDataToFirebase(const SensorData& data) {
     }
 }
 
+void BaseDatos::publicarDatos(){
+    unsigned long now = millis();
+    Serial.println("Publicando");
+    if (publishSensorDataToFirebase(datos.currentData)) {
+        Serial.println("Exitoso");
+        lastPublishTime = now;
+        // Manejo de sesiones
+        if (lastState == 0 && datos.currentData.state == 1) {
+            // Inicia nueva sesión
+            char sessionIdBuf[15];
+            obtenerTimestamp(sessionIdBuf, sizeof(sessionIdBuf));
+            sessionId = String(sessionIdBuf);
+            startTrainingSession(String(DEVICE_ID), sessionId, datos.currentData);
+        } else if (lastState == 1 && datos.currentData.state == 1 && sessionId != "") {
+            // Sube punto a sesión activa
+            char pointIdBuf[7];
+            obtenerHoraId(pointIdBuf, sizeof(pointIdBuf));
+            uploadSessionPoint(String(DEVICE_ID), sessionId, datos.currentData, String(pointIdBuf));
+        } else if (lastState == 1 && datos.currentData.state == 0 && sessionId != "") {
+            // Finaliza sesión
+            endTrainingSession(String(DEVICE_ID), sessionId, getFirestoreTimestamp());
+            sessionId = "";
+        }
+        lastState = datos.currentData.state;
+        // Publicar alarma solo en flanco ascendente de sensor4
+        if (lastSensor4 == 0 && datos.currentData.sensor4 == 1) {
+            publishAlertToFirestore(datos.currentData);
+        }
+        lastSensor4 = datos.currentData.sensor4;
+    }
+    Serial.println("Debug");
+}
 bool publishSensorDataToFirebase(const SensorData& data) {
-    if (!isFirebaseReady()) {
+    if (!dataBase.isBaseDatosReady()) {
         errorPrint("Firebase not ready");
         return false;
     }
@@ -373,7 +466,7 @@ bool processLinkRequest() {
     return true;
 }
 
-bool isFirebaseReady() {
+bool BaseDatos::isBaseDatosReady() {
     return Firebase.ready();
 }
 
@@ -421,7 +514,7 @@ void endTrainingSession(const String& deviceId, const String& sessionId, const S
 }
 
 bool publishAlertToFirestore(const SensorData& data) {
-    if (!isFirebaseReady()) {
+    if (!dataBase.isBaseDatosReady()) {
         errorPrint("Firebase not ready");
         return false;
     }

@@ -5,7 +5,7 @@
 #include "FirebaseHandler.h"
 #include <WiFi.h>
 #include <Preferences.h>
-
+#include "SensorData.h"
 // Función robusta de mapeo flotante
 int mapf(float value, float in_min, float in_max, int out_min, int out_max);
 
@@ -138,7 +138,7 @@ static const unsigned long WELCOME_DURATION = 2500; // 2.5 segundos
 
 // ===== DECLARACIONES DE FUNCIONES DEL SISTEMA DE BACKTRACK =====
 static void initWaypointPrefs();
-static void loadWaypointsFromStorage();
+//static void loadWaypointsFromStorage();
 static void saveWaypointsToStorage();
 static void updateWaypointNavigation();
 
@@ -151,6 +151,24 @@ void selectWaypoint(int index);
 void checkPairingRequests();
 void rejectPairing();
 void acceptPairing();
+
+Display::Display() {
+}
+
+void Display::init() {
+  st7735.st7735_init();
+
+  welcomeStartTime = millis();
+  welcomePhase = 0;
+  currentScreen = MenuScreen::Welcome;
+
+  renderWelcomeScreen();
+
+  Serial.println("--------------------------------");
+  Serial.println("PANTALLA INICIADO CORRECTAMENTE");
+  Serial.println("--------------------------------");
+}
+
 
 // Drawing helper functions
 static void drawCircle(int x, int y, int radius, uint16_t color) {
@@ -1234,16 +1252,17 @@ static void renderBacktrackMap() {
     }
     st7735.st7735_write_str(0, 110, "Up/Down: salir", Font_7x10, ST7735_GRAY);
 }
-
+/*
 void initUI() {
   // Configure buttons
+  
   pinMode(BTN_UP_PIN, INPUT_PULLUP);
   pinMode(BTN_DOWN_PIN, INPUT_PULLUP);
   pinMode(BTN_OK_PIN, INPUT_PULLUP);
   pinMode(BTN_BACK_PIN, INPUT_PULLUP);
-
+  
   // Initialize display
-  st7735.st7735_init();
+  //st7735.st7735_init();
 
   // Initialize wifi preferences storage (NVS)
   {
@@ -1260,15 +1279,15 @@ void initUI() {
     loadWaypointsFromStorage();
     waypointPrefs.end();
   }
-
+*/
   // Start with welcome screen
-  welcomeStartTime = millis();
-  welcomePhase = 0;
-  currentScreen = MenuScreen::Welcome;
+  //welcomeStartTime = millis();
+  //welcomePhase = 0;
+  //currentScreen = MenuScreen::Welcome;
   
   // Draw initial welcome screen
-  renderWelcomeScreen();
-}
+  //renderWelcomeScreen();
+
 
 // --- Pantalla de bienvenida estática ---
 static void drawStaticWelcome() {
@@ -1309,7 +1328,7 @@ bool isWelcomeScreenComplete() {
   return welcomeScreenShown;
 }
 
-void updateUI(unsigned long now) {
+void Display::updateUI(unsigned long now) {
   // Handle welcome screen
   if (currentScreen == MenuScreen::Welcome) {
     // Permitir saltar la pantalla de bienvenida con cualquier botón
@@ -2021,7 +2040,7 @@ bool isLocalGPSAvailable() {
 static void initWaypointPrefs() {
   loadWaypointsFromStorage();
 }
-
+/*
 // Cargar waypoints desde almacenamiento
 static void loadWaypointsFromStorage() {
   Preferences waypointPrefs;
@@ -2039,7 +2058,7 @@ static void loadWaypointsFromStorage() {
   }
   waypointPrefs.end();
 }
-
+*/
 // Guardar waypoints en almacenamiento
 static void saveWaypointsToStorage() {
   Preferences waypointPrefs;

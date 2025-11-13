@@ -17,3 +17,12 @@ bool isGPSValid();
 float getLatitude();
 float getLongitude();
 String getTimeString();
+
+class Geolocation {
+    private:
+        int ubi;
+    public:
+        Geolocation();
+        void init();
+        void  getGpsData();
+};
