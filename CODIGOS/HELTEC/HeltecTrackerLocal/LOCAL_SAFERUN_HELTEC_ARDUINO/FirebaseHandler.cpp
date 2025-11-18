@@ -72,7 +72,6 @@ void BaseDatos::init(){
         if (!isMemoryLow()) {
             Serial.printf("Intento %d de iniciar Firebase...\n", firebaseAttempts);
             // Antes de llamar a startFirebase o Firebase.begin, asegurarse de que no hay Preferences abiertos
-            // (Ya que ahora todos los Preferences se abren/cierra localmente, esto se cumple)
             firebaseStarted = startFirebase();
             
             if (!firebaseStarted && firebaseAttempts >= 3) {
