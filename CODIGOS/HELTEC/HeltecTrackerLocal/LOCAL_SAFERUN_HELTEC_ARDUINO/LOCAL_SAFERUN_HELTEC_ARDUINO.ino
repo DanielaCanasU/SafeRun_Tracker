@@ -62,7 +62,7 @@ void loop() {
         datos.setupTime();
     }
 
-    if (isRemoteModeSelected() && (dataBase.isBaseDatosReady() && (now - dataBase.lastPublishTime >= PUBLISH_INTERVAL || dataBase.lastPublishTime == 0) && (PUBLISH_FIREBASE))) {
+    if (isRemoteModeSelected() && (dataBase.isBaseDatosReady() && (now - dataBase.lastPublishTime >= PUBLISH_INTERVAL || dataBase.lastPublishTime == 0) && (PUBLISH_FIREBASE)) &&  ((datos.currentData.latitude != 0.0f && datos.currentData.longitude != 0.0f) || datos.currentData.sensor4 != 0)){
         dataBase.publicarDatos();
     }
         
