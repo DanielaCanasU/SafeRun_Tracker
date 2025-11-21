@@ -43,10 +43,12 @@ extern const size_t MIN_FREE_HEAP;
 extern const size_t CRITICAL_HEAP;
 
 // Button pins for Heltec Wireless Tracker v1.2
-#define BTN_UP_PIN 4
-#define BTN_DOWN_PIN 5
-#define BTN_OK_PIN 6
-#define BTN_BACK_PIN 18
+
+
+#define BTN_UP_PIN 5
+#define BTN_DOWN_PIN 6
+#define BTN_OK_PIN 18
+#define BTN_BACK_PIN 4
 
 // Function declarations
 void initConfig();
