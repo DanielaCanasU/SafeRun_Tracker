@@ -24,7 +24,7 @@ void Geolocation::init(){
   // Inicializar variables de estado
   gpsDataValid = false;
   lastGPSUpdate = 0;
-  while (!gpsDataValid) {
+  while (!gpsDataValid && (millis() - startTime < 60000)) { // 60 segundos de timeout
     getGpsData();
     
     if (gps.location.isValid() && 
@@ -37,7 +37,7 @@ void Geolocation::init(){
       Serial.printf("LAT: %.6f\n", gps.location.lat());
       Serial.printf("LON: %.6f\n", gps.location.lng());
       Serial.printf("Satélites: %d\n", gps.satellites.value());
-      return;
+      //return;
     }
 
     // Feedback visual cada 500ms
@@ -49,9 +49,7 @@ void Geolocation::init(){
 
   // Si inició correctamente, marcar y forzar transición a menú
   GPSLISTO = true;
-  
-  // Transición automática: dibujar menú principal completo
-  display.drawMenu(SCREEN_MAIN_MENU, true);
+
 }
 
 

@@ -25,9 +25,13 @@ void setup() {
   botones.init();
   display.init(); //Bienvenida
   geolocation.init();
+  display.drawMenu(SCREEN_MAIN_MENU, true);
+
   loRa.init();
   detectorCaida.init();
   analogReadResolution(12);
+  // Transición automática: dibujar menú principal completo
+  display.drawMenu(SCREEN_MAIN_MENU, true);
 }
 
 void loop() {
