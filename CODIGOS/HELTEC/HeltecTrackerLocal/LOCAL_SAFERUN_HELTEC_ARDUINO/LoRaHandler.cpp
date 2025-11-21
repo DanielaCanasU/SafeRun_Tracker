@@ -27,6 +27,39 @@ static uint8_t aes_key[16] = { 'S', 'A', 'F', 'E', 'R', 'U', 'N', 'C', 'I', 'F',
 static uint8_t aes_iv[16]  = { 'I', 'n', 'i', 'c', 'i', 'a', 'l', 'I', 'V', '1', '2', '3', '4', '5', '6', '7'};
 AES aes;
 
+
+LoRa::LoRa(){}
+
+
+void LoRa::init(){
+  SPI.begin();
+  if (LT.begin(NSS, NRESET, RFBUSY, DIO1, DIO2, DIO3, RX_EN, TX_EN, SW, LORA_DEVICE)) {
+    Serial.println("--------------------------------");
+    Serial.println("LORA INICIADO CORRECTAMENTE");
+    Serial.println("--------------------------------");
+      delay(1000);
+    } else {
+      Serial.println("--------------------------------");
+      Serial.println("ERROR INICIANDO LORA");
+      Serial.println("--------------------------------");
+    }
+    LT.setMode(MODE_STDBY_RC);
+    LT.setRegulatorMode(USE_DCDC);
+    LT.setPaConfig(0x04, PAAUTO, LORA_DEVICE);
+    LT.setDIO3AsTCXOCtrl(TCXO_CTRL_3_3V);
+    LT.calibrateDevice(ALLDevices);
+    LT.calibrateImage(Frequency);
+    LT.setDIO2AsRfSwitchCtrl();
+    LT.setPacketType(PACKET_TYPE_LORA);
+    LT.setRfFrequency(Frequency, Offset);
+    LT.setModulationParams(SpreadingFactor, Bandwidth, CodeRate, Optimisation);
+    LT.setBufferBaseAddress(0, 0);
+    LT.setPacketParams(8, LORA_PACKET_VARIABLE_LENGTH, 255, LORA_CRC_ON, LORA_IQ_NORMAL);
+    LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_TX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
+    LT.setHighSensitivity();
+    LT.setSyncWord(LORA_MAC_PRIVATE_SYNCWORD);
+}
+
 // Cifrar mensaje antes de enviar usando AES (Matej Sychra) - soporta longitud variable (múltiplos de 16)
 String cifrarValor(String texto) {
     const int plainLength = texto.length();

@@ -119,5 +119,3 @@ extern FirebaseAuth auth;
 extern FirebaseConfig config;
 
 #endif // FIREBASE_HANDLER_H
-
-

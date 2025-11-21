@@ -14,4 +14,10 @@ void getPacketStats(uint32_t* packetCount, uint32_t* errorCount);
 void printPacketStats();
 String getLastPacketString();
 
-
+class LoRa {
+    private:
+        int mensaje;
+    public:
+        LoRa();
+        void init();
+};

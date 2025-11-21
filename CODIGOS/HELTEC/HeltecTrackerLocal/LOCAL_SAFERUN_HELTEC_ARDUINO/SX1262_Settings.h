@@ -35,7 +35,3 @@ const uint16_t packet_delay = 1000;
 
 // Buffer size
 const uint16_t RXBUFFER_SIZE = 200;
-
-
-
-

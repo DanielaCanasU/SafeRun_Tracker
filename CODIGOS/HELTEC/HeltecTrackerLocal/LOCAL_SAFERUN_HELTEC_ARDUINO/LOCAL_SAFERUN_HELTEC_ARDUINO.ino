@@ -55,14 +55,7 @@ void setup() {
     //yield();
     
     // Initialize LoRa handler
-    if (!initLoRaHandler()) {
-        Serial.println("Failed to initialize LoRa handler");
-        while (1) { delay(1000); //yield(); 
-        }
-    }
-    else {
-        Serial.println("LoRa handler initialized successfully");
-    }
+    loRa.init();
         //yield();
     
     // Initialize Firebase handler (objects only; do not connect yet)
@@ -231,5 +224,3 @@ void loop() {
     // Small delay to prevent watchdog issues
     delay(10);
 }
-
-

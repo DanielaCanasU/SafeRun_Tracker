@@ -52,5 +52,3 @@ extern const size_t CRITICAL_HEAP;
 void initConfig();
 bool isRemoteModeSelected();
 void setRemoteMode(bool v);
-
-

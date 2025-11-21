@@ -54,5 +54,3 @@ void initConfig() {
 
 bool isRemoteModeSelected() { return remoteMode; }
 void setRemoteMode(bool v) { remoteMode = v; }
-
-
