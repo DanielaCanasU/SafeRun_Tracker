@@ -4,8 +4,8 @@
 #include "SensorData.h"
 #include <SPI.h>
 #include "AES.h"  // Librería AES de Matej Sychra
-#include "UI.h"   // Incluir para notificar a la UI de nuevos datos
-
+#include "UI.h" 
+#include "AppState.h"  // Incluir para notificar a la UI de nuevos datos
 // =============================================================================
 // GLOBAL VARIABLES
 // =============================================================================
@@ -27,37 +27,60 @@ static uint8_t aes_key[16] = { 'S', 'A', 'F', 'E', 'R', 'U', 'N', 'C', 'I', 'F',
 static uint8_t aes_iv[16]  = { 'I', 'n', 'i', 'c', 'i', 'a', 'l', 'I', 'V', '1', '2', '3', '4', '5', '6', '7'};
 AES aes;
 
-
 LoRa::LoRa(){}
 
-
-void LoRa::init(){
-  SPI.begin();
-  if (LT.begin(NSS, NRESET, RFBUSY, DIO1, DIO2, DIO3, RX_EN, TX_EN, SW, LORA_DEVICE)) {
-    Serial.println("--------------------------------");
-    Serial.println("LORA INICIADO CORRECTAMENTE");
-    Serial.println("--------------------------------");
-      delay(1000);
+void LoRa::init() {
+    SPI.begin();
+    if (LT.begin(NSS, NRESET, RFBUSY, DIO1, LORA_DEVICE)) {
+        Serial.println("--------------------------------");
+        Serial.println("LORA INICIADO CORRECTAMENTE");
+        Serial.println("--------------------------------");
+        delay(1000);
+        LT.setMode(MODE_RX);
+        LT.setRegulatorMode(USE_DCDC);
+        LT.setPaConfig(0x04, PAAUTO, LORA_DEVICE);
+        LT.setDIO3AsTCXOCtrl(TCXO_CTRL_3_3V);
+        LT.calibrateDevice(ALLDevices);  //is required after setting TCXO
+        LT.calibrateImage(Frequency);
+        LT.setDIO2AsRfSwitchCtrl();
+        LT.setPacketType(PACKET_TYPE_LORA);
+        LT.setRfFrequency(Frequency, Offset);
+        LT.setModulationParams(SpreadingFactor, Bandwidth, CodeRate, Optimisation);
+        LT.setBufferBaseAddress(0, 0);
+        LT.setPacketParams(8, LORA_PACKET_VARIABLE_LENGTH, 255, LORA_CRC_ON, LORA_IQ_NORMAL);
+        LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
+        LT.setHighSensitivity();
+        LT.setSyncWord(LORA_MAC_PRIVATE_SYNCWORD);
     } else {
-      Serial.println("--------------------------------");
-      Serial.println("ERROR INICIANDO LORA");
-      Serial.println("--------------------------------");
+        Serial.println("--------------------------------");
+        Serial.println("ERROR INICIANDO LORA");
+        Serial.println("--------------------------------");
     }
-    LT.setMode(MODE_STDBY_RC);
-    LT.setRegulatorMode(USE_DCDC);
-    LT.setPaConfig(0x04, PAAUTO, LORA_DEVICE);
-    LT.setDIO3AsTCXOCtrl(TCXO_CTRL_3_3V);
-    LT.calibrateDevice(ALLDevices);
-    LT.calibrateImage(Frequency);
-    LT.setDIO2AsRfSwitchCtrl();
-    LT.setPacketType(PACKET_TYPE_LORA);
-    LT.setRfFrequency(Frequency, Offset);
-    LT.setModulationParams(SpreadingFactor, Bandwidth, CodeRate, Optimisation);
-    LT.setBufferBaseAddress(0, 0);
-    LT.setPacketParams(8, LORA_PACKET_VARIABLE_LENGTH, 255, LORA_CRC_ON, LORA_IQ_NORMAL);
-    LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_TX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
-    LT.setHighSensitivity();
-    LT.setSyncWord(LORA_MAC_PRIVATE_SYNCWORD);
+}
+
+void LoRa::checkIncomeMessage() {
+    unsigned long now = millis();
+    // LoRa reception logic (exactly like ESP32)
+    if(!WAITING_LORA) {
+        LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);  //set for IRQ on RX done or timeout
+        LT.setRx(LORA_TIMEOUT);
+        WAITING_LORA = true;
+    }
+    
+    // Process LoRa messages
+    if (now - lastLoraCheck >= LORA_CHECK_INTERVAL) {
+        if(digitalRead(14)) {
+                processLoRaMessage(datos.currentData);
+                Serial.println("Valid LoRa message received");
+                printSensorData(datos.currentData);
+                
+                // Update tracking system with received data
+                updateTrackingData(datos.currentData);
+                
+                WAITING_LORA = false;
+        }   
+        lastLoraCheck = now;
+    }
 }
 
 // Cifrar mensaje antes de enviar usando AES (Matej Sychra) - soporta longitud variable (múltiplos de 16)
@@ -149,7 +172,21 @@ bool initLoRaHandler() {
     
     if (LT.begin(NSS, NRESET, RFBUSY, DIO1, LORA_DEVICE)) {
         Serial.println("LoRa Device found");
-        configureSX1262();
+        LT.setMode(MODE_RX);
+        LT.setRegulatorMode(USE_DCDC);
+        LT.setPaConfig(0x04, PAAUTO, LORA_DEVICE);
+        LT.setDIO3AsTCXOCtrl(TCXO_CTRL_3_3V);
+        LT.calibrateDevice(ALLDevices);  //is required after setting TCXO
+        LT.calibrateImage(Frequency);
+        LT.setDIO2AsRfSwitchCtrl();
+        LT.setPacketType(PACKET_TYPE_LORA);
+        LT.setRfFrequency(Frequency, Offset);
+        LT.setModulationParams(SpreadingFactor, Bandwidth, CodeRate, Optimisation);
+        LT.setBufferBaseAddress(0, 0);
+        LT.setPacketParams(8, LORA_PACKET_VARIABLE_LENGTH, 255, LORA_CRC_ON, LORA_IQ_NORMAL);
+        LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
+        LT.setHighSensitivity();
+        LT.setSyncWord(LORA_MAC_PRIVATE_SYNCWORD);
         return true;
     } else {
         Serial.println("No LoRa device responding");
@@ -236,7 +273,7 @@ bool processLoRaMessage(SensorData &data) { // El parámetro 'data' se mantiene 
         Serial.println(packetDescifrado);
         // Parse the message and populate sensor data
         SensorData tempData;
-        initSensorData(tempData); // Inicializar con valores por defecto
+        datos.initPaquete(tempData); // Inicializar con valores por defecto
 
         if (parseLoRaMessage(packetDescifrado, tempData)) {
             // El parseo fue exitoso

@@ -15,6 +15,21 @@ struct SensorData {
   float accelX, accelY, accelZ;
 };
 
+class Data {
+  private:
+    int numero;
+    unsigned long lastCheckEnlace = 0;
+  public:
+    Data();
+    void init();
+    void initPaquete(SensorData &data);
+    void setupTime();
+    SensorData currentData;
+    SensorData tempData;
+    bool timeSynced = false;
+    
+};
 void initSensorData(SensorData &data);
 bool parseLoRaMessage(String message, SensorData &data);
 void printSensorData(const SensorData &data);
+extern void loadWaypointsFromStorage();

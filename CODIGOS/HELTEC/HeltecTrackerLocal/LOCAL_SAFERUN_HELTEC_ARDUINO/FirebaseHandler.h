@@ -118,4 +118,30 @@ extern FirebaseData fbdo;
 extern FirebaseAuth auth;
 extern FirebaseConfig config;
 
+class BaseDatos {
+    private:
+      int numero;
+      unsigned long lastCheckEnlace = 0;
+      bool checkForLinkRequest();
+      unsigned long lastFirebaseAttempt = 0;
+      int firebaseAttempts = 0;
+      int lastState = 0;
+      String sessionId = "";
+      int lastSensor4 = 0;
+
+
+
+  
+    public:
+        BaseDatos();
+        void init();
+        void checkEnlace(bool open);
+        bool isBaseDatosReady();
+        void publicarDatos();
+        bool firebaseStarted = false;
+        unsigned long lastPublishTime = 0;
+
+
+  };
+
 #endif // FIREBASE_HANDLER_H

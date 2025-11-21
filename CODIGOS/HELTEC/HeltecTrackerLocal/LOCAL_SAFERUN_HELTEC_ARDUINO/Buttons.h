@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
-#include "Config.h"
+//#include "Config.h"
+//#include "Pins.h"
 
 class Botones {
     private:  
@@ -17,16 +18,9 @@ class Botones {
     public:
         Botones();
         void init();
-        void checkUserEntry();
-        void checkEmergencyCombo();
-        void handleUserGestures(uint8_t button, bool isLongPress, bool isDoubleClick, bool isTripleClick);
+        //void checkUserEntry();
+        //void checkEmergencyCombo();
+        //void handleUserGestures(uint8_t button, bool isLongPress, bool isDoubleClick, bool isTripleClick);
 };
-
-void initButtonsState();
-void IRAM_ATTR handleLeftInterrupt();
-void IRAM_ATTR handleRightInterrupt();
-void IRAM_ATTR handleSelectInterrupt();
-void processButtonPress();
-void handleButtonPress(uint8_t button, bool isLongPress, bool isDoubleClick, bool isTripleClick = false);
 
 

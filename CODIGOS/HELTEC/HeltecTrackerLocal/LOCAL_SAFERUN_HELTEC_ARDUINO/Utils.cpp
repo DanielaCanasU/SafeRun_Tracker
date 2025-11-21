@@ -12,6 +12,7 @@ char timestamp[20];
 // UTILS IMPLEMENTATION
 // =============================================================================
 
+/*
 void setupTime() {
     configTime(TIMEZONE_OFFSET * 3600, 0, NTP_SERVER_1, NTP_SERVER_2);
     Serial.print("Esperando sincronización NTP");
@@ -37,6 +38,8 @@ void setupTime() {
         Serial.println("Timeout - continuando sin sincronización completa");
     }
 }
+
+*/
 
 void obtenerTimestamp(char* timestamp, size_t bufferSize) {
     time_t now = time(nullptr);

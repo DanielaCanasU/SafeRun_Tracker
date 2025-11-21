@@ -599,7 +599,6 @@ void drawEmergencyScreen(bool firstDraw) {
   }
   if (!detectorCaida.emergencia) {
     drawRoundedRectangle(22, 20, 115, 30, 4, ST7735_GREEN);
-    st7735.st7735_write_str(40, 28, "A SALVO", Font_11x18, ST7735_BLACK, ST7735_GREEN);
     st7735.st7735_write_str(5, 60, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);
     st7735.st7735_write_str(25, 70, "para enviar SOS", Font_7x10, ST7735_WHITE);
   } else {

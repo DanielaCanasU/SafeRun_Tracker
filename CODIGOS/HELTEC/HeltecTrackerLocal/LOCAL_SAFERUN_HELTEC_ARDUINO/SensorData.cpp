@@ -1,5 +1,98 @@
 #include "SensorData.h"
+#include <Preferences.h>
+#include "Config.h"
 
+// Estructura para waypoints del backtrack
+struct Waypoint {
+  float latitude;
+  float longitude;
+  String name;
+  unsigned long timestamp;
+  bool isValid;
+};
+
+static const int MAX_WAYPOINTS = 30;
+static int waypointCount = 0;
+static Waypoint waypoints[MAX_WAYPOINTS];
+
+
+Data::Data() {}
+
+void Data::init() {
+  initPaquete(currentData);
+
+  {
+    Preferences wifiPrefs;
+    wifiPrefs.begin("wifi", false);
+    // Leer datos si es necesario aquí
+    wifiPrefs.end();
+  }
+
+  // Initialize waypoint preferences storage (NVS)
+  {
+    Preferences waypointPrefs;
+    waypointPrefs.begin("waypoints", false);
+    loadWaypointsFromStorage();
+    waypointPrefs.end();
+  }
+}
+
+void Data::initPaquete(SensorData &data) {
+  data.latitude = 0.0f;
+  data.longitude = 0.0f;
+  data.state = 0;
+  data.sensor1 = data.sensor2 = data.sensor3 = data.sensor4 = 0;
+  data.rssi = 0;
+  data.snr = 0;
+  data.receivedAt = 0;
+  data.accelX = data.accelY = data.accelZ = 0.0f;
+}
+
+void Data::setupTime() {
+  configTime(TIMEZONE_OFFSET * 3600, 0, NTP_SERVER_1, NTP_SERVER_2);
+  Serial.print("Esperando sincronización NTP");
+  
+  // Esperar máximo 10 segundos para evitar timeout del watchdog
+  int attempts = 0;
+  const int maxAttempts = 20; // 10 segundos (500ms * 20)
+  
+  time_t now = time(nullptr);
+  while (now < 8 * 3600 * 2 && attempts < maxAttempts) {
+      delay(500);
+      Serial.print(".");
+      now = time(nullptr);
+      attempts++;
+      
+      // Alimentar el watchdog durante la espera
+      yield();
+  }
+  
+  if (now >= 8 * 3600 * 2) {
+      Serial.println("¡Sincronizado!");
+  } else {
+      Serial.println("Timeout - continuando sin sincronización completa");
+  }
+  timeSynced = true;
+}
+
+
+void loadWaypointsFromStorage() {
+  Preferences waypointPrefs;
+  waypointPrefs.begin("waypoints", false);
+  waypointCount = waypointPrefs.getInt("count", 0);
+  if (waypointCount > MAX_WAYPOINTS) waypointCount = MAX_WAYPOINTS;
+  
+  for (int i = 0; i < waypointCount; i++) {
+    String prefix = "wp" + String(i) + "_";
+    waypoints[i].latitude = waypointPrefs.getFloat((prefix + "lat").c_str(), 0.0f);
+    waypoints[i].longitude = waypointPrefs.getFloat((prefix + "lon").c_str(), 0.0f);
+    waypoints[i].name = waypointPrefs.getString((prefix + "name").c_str(), "Punto " + String(i + 1));
+    waypoints[i].timestamp = waypointPrefs.getULong((prefix + "time").c_str(), 0);
+    waypoints[i].isValid = true;
+  }
+  waypointPrefs.end();
+}
+/*
 void initSensorData(SensorData &data) {
   data.latitude = 0.0f;
   data.longitude = 0.0f;
@@ -10,6 +103,7 @@ void initSensorData(SensorData &data) {
   data.receivedAt = 0;
   data.accelX = data.accelY = data.accelZ = 0.0f;
 }
+  */
 
 bool parseLoRaMessage(String message, SensorData &data) {
   message.replace("*", "");

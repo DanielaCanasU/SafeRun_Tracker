@@ -12,7 +12,7 @@ const char* WIFI_PASSWORD = "28082002";
 const char* FIREBASE_API_KEY = "AIzaSyCJKe-5L4JoW3pdE-0EMIN0Sl6rUHdHIEs";
 const char* FIREBASE_PROJECT_ID = "monitoreodeportistas";
 const char* FIREBASE_DATABASE_URL = "https://monitoreodeportistas-default-rtdb.firebaseio.com";
-const char* DEVICE_ID = "123456";
+const char* DEVICE_ID = "456";
 const char* USER_EMAIL = "justtoprivacy@gmail.com";
 const char* USER_PASSWORD = "28082002";
 
