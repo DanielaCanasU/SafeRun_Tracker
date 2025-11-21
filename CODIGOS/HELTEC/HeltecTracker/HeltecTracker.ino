@@ -18,61 +18,29 @@
 #include "Battery.h"
 
 void setup() {
-  // Pines botones
-  pinMode(BUTTON_LEFT, INPUT_PULLUP);
-  pinMode(BUTTON_RIGHT, INPUT_PULLUP);
-  pinMode(BUTTON_SELECT, INPUT_PULLUP);
-  pinMode(2, INPUT_PULLUP);
-
-  analogReadResolution(12);
-
-  // Interrupciones botones
-  attachInterrupt(digitalPinToInterrupt(BUTTON_LEFT), handleLeftInterrupt, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_RIGHT), handleRightInterrupt, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_SELECT), handleSelectInterrupt, CHANGE);
-
-  // Estado inicial de botones
-  initButtonsState();
-
   Serial.begin(115200);
+  delay(1000);
 
-  // I2C acelerómetro
-  Wire.begin(ADXL345_SDA_PIN, ADXL345_SCL_PIN);
+  //Inicio de subsistemas
+  botones.init();
+  display.init(); //Bienvenida
+  geolocation.init();
+  display.drawMenu(SCREEN_MAIN_MENU, true);
 
-  // Pantalla
-  displayInit();
-  st7735.st7735_fill_screen(ST7735_BLACK);
-  drawMainMenu();
-
-  // LoRa SX1262
-  SPI.begin();
-  if (LT.begin(NSS, NRESET, RFBUSY, DIO1, DIO2, DIO3, RX_EN, TX_EN, SW, LORA_DEVICE)) {
-    Serial.println(F("LoRa Device found"));
-    delay(1000);
-  } else {
-    Serial.println(F("No device responding"));
-  }
-  configureSX1262();
-
-  // GPS
-  Serial.println("Configurando GPS...");
-  configureGPS();
-
-  // DFPlayer (opcional)
-  Serial.println("Configurando DFPlayer Mini...");
-  //configureDFPlayer();
-
-  // Acelerómetro
-  Serial.println("Iniciando ADXL345");
-  setupAcelerometro();
+  loRa.init();
+  detectorCaida.init();
+  analogReadResolution(12);
+  // Transición automática: dibujar menú principal completo
+  display.drawMenu(SCREEN_MAIN_MENU, true);
 }
 
 void loop() {
   const unsigned long currentTime = millis();
 
-  // Botones
-  processButtonPress();
+  //Manejar si el usuario utilizó algún botón
+  botones.checkUserEntry();
 
+  
   // Pantallas según menú
   if (currentScreen == SCREEN_MAIN_MENU) {
     // El menú principal no necesita actualizaciones constantes
@@ -91,13 +59,14 @@ void loop() {
     handleExerciseScreen();
   }
 
-
+  detectorCaida.checkStatus();
+  
+  
   // Monitoreo acelerómetro
-  accelLoop();
+  //accelLoop();
 
   // GPS feed
   getGpsData();
-
   // Envío periódico por LoRa (siempre). El contenido incluye GPS solo cuando isMonitoringActive == true
   if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa)) {
     lastSendTime_LoRa = currentTime;
@@ -108,32 +77,32 @@ void loop() {
       len = snprintf(message, sizeof(message),
                      "GPS:%s,%s; ST:%d,%d,%d,%d,%d; ACC:%.2f,%.2f,%.2f",
                      latitude.c_str(), longitude.c_str(),
-                     1, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0,
+                     1, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0,
                      x, y, z);
 #else
       len = snprintf(message, sizeof(message),
                      "GPS:%s,%s; ST:%d,%d,%d,%d,%d",
                      latitude.c_str(), longitude.c_str(),
-                     1, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0);
+                     1, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0);
 #endif
     } else {
 #ifdef ENVIAR_ACELEROMETRO
       len = snprintf(message, sizeof(message),
                      "ST:%d,%d,%d,%d,%d; ACC:%.2f,%.2f,%.2f",
-                     0, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0,
+                     0, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0,
                      x, y, z);
 #else
       len = snprintf(message, sizeof(message),
                      "ST:%d,%d,%d,%d,%d",
-                     0, impacto ? 1 : 0,
-                     free_fall ? 1 : 0, segunda_condicion_caida ? 1 : 0,
-                     emergencia ? 1 : 0);
+                     0, detectorCaida.impacto ? 1 : 0,
+                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                     detectorCaida.emergencia ? 1 : 0);
 #endif
     }
     if (len > 0 && len < (int)sizeof(message) - 1) {
