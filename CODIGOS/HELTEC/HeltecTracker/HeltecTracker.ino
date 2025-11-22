@@ -73,37 +73,20 @@ void loop() {
     char message[128];
     int len = 0;
     if (isMonitoringActive) {
-#ifdef ENVIAR_ACELEROMETRO
-      len = snprintf(message, sizeof(message),
-                     "GPS:%s,%s; ST:%d,%d,%d,%d,%d; ACC:%.2f,%.2f,%.2f",
-                     latitude.c_str(), longitude.c_str(),
-                     1, detectorCaida.impacto ? 1 : 0,
-                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
-                     detectorCaida.emergencia ? 1 : 0,
-                     x, y, z);
-#else
+
       len = snprintf(message, sizeof(message),
                      "GPS:%s,%s; ST:%d,%d,%d,%d,%d",
                      latitude.c_str(), longitude.c_str(),
                      1, detectorCaida.impacto ? 1 : 0,
                      detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
                      detectorCaida.emergencia ? 1 : 0);
-#endif
     } else {
-#ifdef ENVIAR_ACELEROMETRO
-      len = snprintf(message, sizeof(message),
-                     "ST:%d,%d,%d,%d,%d; ACC:%.2f,%.2f,%.2f",
-                     0, detectorCaida.impacto ? 1 : 0,
-                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
-                     detectorCaida.emergencia ? 1 : 0,
-                     x, y, z);
-#else
+
       len = snprintf(message, sizeof(message),
                      "ST:%d,%d,%d,%d,%d",
                      0, detectorCaida.impacto ? 1 : 0,
                      detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
                      detectorCaida.emergencia ? 1 : 0);
-#endif
     }
     if (len > 0 && len < (int)sizeof(message) - 1) {
       message[len] = '*';
@@ -112,14 +95,7 @@ void loop() {
     sendMessage(message, true);
   }
 
-  // Batería
-  batteryVoltage = readBatteryVoltage();
-  int newPercent = batteryVoltageToPercent(batteryVoltage);
-  if (newPercent != batteryPercent) {
-    batteryPercent = newPercent;
-  }
-  // Actualizar indicador de batería en pantalla GPS solo cuando cambia
-  //updateGPSBatteryIndicator();
+
 }
 
 

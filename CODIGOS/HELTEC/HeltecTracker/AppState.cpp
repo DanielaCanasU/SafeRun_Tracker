@@ -27,8 +27,6 @@ Display display;
 
 // Variables
 std::vector<int> lista_canciones;
-float batteryVoltage = 0.0f;
-int batteryPercent = 0;
 // Nuevo flag para indicar que el DFPlayer está listo
 extern bool GPSLISTO;
 bool GPSLISTO = false;

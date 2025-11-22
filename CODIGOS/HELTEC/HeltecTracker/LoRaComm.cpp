@@ -1,6 +1,7 @@
 #include "LoRaComm.h"
 #include <SPI.h>
 #include "SX1262_Settings.h"
+#include "Config.h"
 #include <AES.h> // Librería de Matej Sychra
 
 // Clave y vector de inicialización para AES (16 bytes cada uno)
@@ -154,21 +155,27 @@ void configureSX1262() {
 }
 
 void sendMessage(const char* message, bool verbose) {
-  // Cifrar el mensaje antes de enviarlo
+  // Cifrar solo el mensaje de datos (sin los IDs)
   String cifrado = cifrarValor(String(message));
-  int TXPacketL = cifrado.length();
+  
+  // Construir mensaje completo con IDs sin cifrar al inicio
+  // Formato: FROM:deviceId;TO:targetId;DATA:cifrado
+  String mensajeCompleto = "FROM:" + String(DEVICE_ID) + ";TO:" + String(TARGET_DEVICE_ID) + ";DATA:" + cifrado;
+  
+  int TXPacketL = mensajeCompleto.length();
   if (verbose) {
-    Serial.print("Contenido cifrado: "); Serial.println(cifrado);
+    Serial.print("Mensaje completo (IDs sin cifrar): "); Serial.println(mensajeCompleto);
+    Serial.print("Contenido cifrado (solo DATA): "); Serial.println(cifrado);
     Serial.print("Bytes como int: ");
-    for (int i = 0; i < TXPacketL; i++) { Serial.print((int)cifrado[i]); Serial.print(" "); }
+    for (int i = 0; i < TXPacketL; i++) { Serial.print((int)mensajeCompleto[i]); Serial.print(" "); }
     Serial.println();
-    Serial.print("Longitud real del mensaje cifrado: "); Serial.println(TXPacketL);
+    Serial.print("Longitud real del mensaje completo: "); Serial.println(TXPacketL);
     Serial.print(TXpower); Serial.print(F("dBm ")); Serial.print(F("Packet> ")); Serial.flush();
   }
   unsigned long startmS = millis();
   delay(10);
   if (TRANSMISION_COMPLETADA || TRANSMISION_FALLIDA) {
-    LT.transmitDaniela((uint8_t*)cifrado.c_str(), TXPacketL, 10000, TXpower, WAIT_TX);
+    LT.transmitDaniela((uint8_t*)mensajeCompleto.c_str(), TXPacketL, 10000, TXpower, WAIT_TX);
     TRANSMISION_COMPLETADA = false; TRANSMISION_FALLIDA = false;
   } else if (digitalRead(14)) {
     if (LT.readIrqStatus() & IRQ_RX_TX_TIMEOUT) TRANSMISION_FALLIDA = true; else TRANSMISION_COMPLETADA = true;
@@ -176,11 +183,26 @@ void sendMessage(const char* message, bool verbose) {
   if (TRANSMISION_COMPLETADA) {
     unsigned long endmS = millis();
     if (verbose) {
-      uint16_t localCRC = LT.CRCCCITT((uint8_t*)cifrado.c_str(), TXPacketL, 0xFFFF);
+      uint16_t localCRC = LT.CRCCCITT((uint8_t*)mensajeCompleto.c_str(), TXPacketL, 0xFFFF);
       Serial.print(F("  BytesSent,")); Serial.print(TXPacketL);
       Serial.print(F("  CRC,")); Serial.print(localCRC, HEX);
       Serial.print(F("  TransmitTime,")); Serial.print(endmS - startmS); Serial.print(F("mS"));
       Serial.print(F("  PacketsSent,")); Serial.print(TXPacketCount);
+    }
+    
+    // Esperar ACK después de enviar exitosamente
+    if (verbose) {
+      Serial.println(F("\nEsperando ACK..."));
+    }
+    bool ackOk = waitForACK();
+    if (ackOk) {
+      if (verbose) {
+        Serial.println(F("✓ Mensaje confirmado por receptor"));
+      }
+    } else {
+      if (verbose) {
+        Serial.println(F("✗ No se recibió confirmación (ACK timeout)"));
+      }
     }
   }
   if (TRANSMISION_FALLIDA) {
@@ -193,5 +215,108 @@ void sendMessage(const char* message, bool verbose) {
   }
 }
 
+// Variables globales para rastrear ACK
+static bool ackReceived = false;
+static bool waitingForACK = false;
+static unsigned long ackWaitStartTime = 0;
+
+// Función para verificar si hay un ACK recibido
+bool checkForACK() {
+  if (!waitingForACK) {
+    return false;
+  }
+  
+  // Verificar timeout
+  unsigned long now = millis();
+  if (now - ackWaitStartTime > ACK_TIMEOUT) {
+    waitingForACK = false;
+    Serial.println("ACK timeout - no se recibió confirmación");
+    return false;
+  }
+  
+  // Verificar si hay un paquete recibido
+  if (digitalRead(14)) {  // DIO1 indica IRQ
+    uint16_t IRQStatus = LT.readIrqStatus();
+    
+    if (IRQStatus & IRQ_RX_DONE) {
+      // Hay un mensaje recibido, intentar leerlo
+      uint8_t rxBuffer[64];
+      uint8_t rxLength = LT.receive(rxBuffer, sizeof(rxBuffer), 0, WAIT_RX);
+      
+      if (rxLength > 0) {
+        String packet = "";
+        for (int i = 0; i < rxLength; i++) {
+          packet += (char)rxBuffer[i];
+        }
+        
+        // Verificar si es un ACK
+        // Formato: ACK:FROM:456;TO:001
+        Serial.print("Paquete recibido (posible ACK): ");
+        Serial.println(packet);
+        
+        if (packet.indexOf("ACK:") == 0) {
+          int toIndex = packet.indexOf("TO:");
+          if (toIndex != -1) {
+            // Extraer TO ID (desde "TO:" hasta el final, sin espacios)
+            String toId = packet.substring(toIndex + 3);
+            toId.trim(); // Limpiar espacios y saltos de línea
+            
+            Serial.print("ACK recibido con TO ID: ");
+            Serial.print(toId);
+            Serial.print(", Local DEVICE_ID: ");
+            Serial.println(DEVICE_ID);
+            
+            // Verificar si el ACK es para este dispositivo
+            if (toId == String(DEVICE_ID)) {
+              Serial.println("✓ ACK recibido exitosamente!");
+              ackReceived = true;
+              waitingForACK = false;
+              return true;
+            } else {
+              Serial.print("ACK recibido pero no es para este dispositivo. TO: ");
+              Serial.println(toId);
+            }
+          }
+        } else {
+          Serial.println("Paquete recibido no es un ACK (no comienza con 'ACK:')");
+        }
+      }
+      
+      // Limpiar IRQ
+      LT.clearIrqStatus(IRQ_RADIO_ALL);
+    }
+  }
+  
+  return false;
+}
+
+// Función para esperar ACK después de enviar un mensaje
+bool waitForACK() {
+  waitingForACK = true;
+  ackReceived = false;
+  ackWaitStartTime = millis();
+  
+  // Configurar para recibir
+  LT.setMode(MODE_RX);
+  LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
+  LT.setRx(ACK_TIMEOUT);
+  
+  // Esperar ACK
+  while (waitingForACK && (millis() - ackWaitStartTime < ACK_TIMEOUT)) {
+    if (checkForACK()) {
+      return true;
+    }
+    delay(10); // Pequeño delay para no saturar el loop
+  }
+  
+  waitingForACK = false;
+  return ackReceived;
+}
+
 void checkForIncomingMessage() {
+  // Esta función puede usarse para verificar mensajes entrantes en el loop principal
+  // Por ahora, solo verifica ACK si estamos esperando uno
+  if (waitingForACK) {
+    checkForACK();
+  }
 }

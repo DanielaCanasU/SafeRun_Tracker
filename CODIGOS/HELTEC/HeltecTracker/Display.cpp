@@ -431,17 +431,7 @@ void updateGPSFieldsIfChanged(const String& newTime, const String& newLat, const
   }
 }
 
-void updateGPSBatteryIndicator() {
-  if (currentScreen != SCREEN_GPS) return;
-  static int lastPercent = -1;
-  if (batteryPercent == lastPercent) return;
-  char voltStr[20];
-  snprintf(voltStr, sizeof(voltStr), "Bat: %d%%", batteryPercent);
-  // Limpiar solo el área de la batería (arriba derecha)
-  st7735.st7735_fill_rectangle(80, 0, 48, 10, ST7735_BLACK);
-  st7735.st7735_write_str(80, 0, voltStr, Font_7x10, ST7735_YELLOW);
-  lastPercent = batteryPercent;
-}
+
 
 // MP3 UI (idéntico a tu implementación, con variables globales desde AppState)
 void drawMP3Screen(bool firstDraw) {
@@ -536,11 +526,6 @@ void drawInfoScreen() {
   st7735.st7735_write_str(0, 0, "SafeRun Tracker", Font_7x10, ST7735_WHITE);
   st7735.st7735_write_str(0, 15, "Dispositivo Remoto", Font_7x10, ST7735_GREEN);
 
-  // Información del sistema
-  st7735.st7735_write_str(0, 35, "Bateria:", Font_7x10, ST7735_WHITE);
-  char batStr[10];
-  snprintf(batStr, sizeof(batStr), "%d%%", batteryPercent);
-  st7735.st7735_write_str(60, 35, batStr, Font_7x10, ST7735_YELLOW);
 
   st7735.st7735_write_str(0, 50, "Estado:", Font_7x10, ST7735_WHITE);
   const char* statusText = isMonitoringActive ? "Activo" : "Inactivo";

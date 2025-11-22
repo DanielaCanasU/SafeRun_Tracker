@@ -1,8 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-// Habilitar envío de datos de acelerómetro en el payload LoRa
-#define ENVIAR_ACELEROMETRO
+
 
 // Temporizadores (ms)
 inline constexpr unsigned long sendInterval_LoRa = 1000;   // 1s
@@ -17,5 +16,12 @@ inline constexpr unsigned long DEBOUNCE_TIME    = 300;
 inline constexpr unsigned long TRIPLE_CLICK_TIME = 600;  
 inline constexpr unsigned long CLICK_TIMEOUT     = 400;  
 inline constexpr unsigned long VOLUME_UPDATE_INTERVAL = 200;
+
+// IDs de dispositivo LoRa
+#define DEVICE_ID "001"  // ID del dispositivo remoto (HeltecTracker)
+#define TARGET_DEVICE_ID "456"  // ID del dispositivo destino (LOCAL_SAFERUN)
+
+// ACK timeout en milisegundos
+inline constexpr unsigned long ACK_TIMEOUT = 1000;  // 1 segundo para esperar ACK
 
 

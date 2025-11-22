@@ -18,7 +18,6 @@ void drawMenuDots(MenuScreen currentMenu);
 void drawMainMenu();
 void drawGPSScreen(bool firstDraw = true, bool updateLatitude = false, bool updateLongitude = false);
 void updateGPSFieldsIfChanged(const String& newTime, const String& newLat, const String& newLon);
-void updateGPSBatteryIndicator();
 void drawFolderScreen(bool firstDraw = false);
 void drawMP3Screen(bool firstDraw = false);
 void drawMonitoringScreen();

@@ -7,6 +7,8 @@ bool sendCommand(String command, unsigned long timeout = 1000, bool waitForOK = 
 void configureSX1262();
 void sendMessage(const char* message, bool verbose = false);
 void checkForIncomingMessage();
+bool checkForACK();
+bool waitForACK();
 
 
 class LoRa {

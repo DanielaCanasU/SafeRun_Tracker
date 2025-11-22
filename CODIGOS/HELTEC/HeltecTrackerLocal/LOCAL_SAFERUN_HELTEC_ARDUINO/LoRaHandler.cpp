@@ -267,10 +267,75 @@ bool processLoRaMessage(SensorData &data) { // El parámetro 'data' se mantiene 
         for (int i = 0; i < RXPacketL; i++) {
             packet += (char)RXBUFFER[i];
         }
+        Serial.print("Paquete recibido completo: ");
         Serial.println(packet);
-        // Descifra el mensaje recibido
-        String packetDescifrado = descifrarValor(packet);
+        
+        // Extraer IDs sin cifrar (formato: FROM:deviceId;TO:targetId;DATA:cifrado)
+        String fromId = "";
+        String toId = "";
+        String dataPart = "";
+        
+        // Buscar marcadores en el formato: FROM:deviceId;TO:targetId;DATA:cifrado
+        int fromIndex = packet.indexOf("FROM:");
+        int toIndex = packet.indexOf("TO:");
+        int dataIndex = packet.indexOf("DATA:");
+        
+        if (fromIndex == -1 || toIndex == -1 || dataIndex == -1) {
+            Serial.println("Error: Formato de mensaje incorrecto. No se encontraron IDs.");
+            return false;
+        }
+        
+        // Verificar que los índices estén en orden correcto
+        if (fromIndex >= toIndex || toIndex >= dataIndex) {
+            Serial.println("Error: Orden incorrecto de los marcadores en el mensaje.");
+            return false;
+        }
+        
+        // Extraer FROM ID: desde después de "FROM:" hasta antes de ";TO:"
+        // Buscar el punto y coma después de FROM:
+        int fromSemicolon = packet.indexOf(';', fromIndex + 5);
+        if (fromSemicolon == -1 || fromSemicolon > toIndex) {
+            Serial.println("Error: No se encontró delimitador después de FROM:");
+            return false;
+        }
+        fromId = packet.substring(fromIndex + 5, fromSemicolon);
+        
+        // Extraer TO ID: desde después de "TO:" hasta antes de ";DATA:"
+        // Buscar el punto y coma después de TO:
+        int toSemicolon = packet.indexOf(';', toIndex + 3);
+        if (toSemicolon == -1 || toSemicolon > dataIndex) {
+            Serial.println("Error: No se encontró delimitador después de TO:");
+            return false;
+        }
+        toId = packet.substring(toIndex + 3, toSemicolon);
+        
+        // Extraer DATA (parte cifrada): desde después de "DATA:" hasta el final
+        dataPart = packet.substring(dataIndex + 5);
+        
+        Serial.print("FROM ID: ");
+        Serial.println(fromId);
+        Serial.print("TO ID: ");
+        Serial.println(toId);
+        Serial.print("DATA (cifrado): ");
+        Serial.println(dataPart);
+        
+        // Verificar si el mensaje es para este dispositivo
+        String localDeviceId = String(DEVICE_ID);
+        if (toId != localDeviceId) {
+            Serial.print("Mensaje no es para este dispositivo. TO: ");
+            Serial.print(toId);
+            Serial.print(", Local: ");
+            Serial.println(localDeviceId);
+            return false;
+        }
+        
+        Serial.println("Mensaje dirigido a este dispositivo. Procediendo a descifrar...");
+        
+        // Descifra solo la parte DATA del mensaje
+        String packetDescifrado = descifrarValor(dataPart);
+        Serial.print("Mensaje descifrado: ");
         Serial.println(packetDescifrado);
+        
         // Parse the message and populate sensor data
         SensorData tempData;
         datos.initPaquete(tempData); // Inicializar con valores por defecto
@@ -291,7 +356,10 @@ bool processLoRaMessage(SensorData &data) { // El parámetro 'data' se mantiene 
             updateLocalLoRaData(tempData);
             updateTrackingData(tempData);
             // Actualizar el string del último paquete para otras interfaces (si se usa)
-            lastPacket = String(millis() / 1000) + "s," + packetDescifrado + "," + String(PacketRSSI) + "dBm," + String(PacketSNR) + "dB";
+            lastPacket = String(millis() / 1000) + "s,FROM:" + fromId + "," + packetDescifrado + "," + String(PacketRSSI) + "dBm," + String(PacketSNR) + "dB";
+            
+            // Enviar ACK al remitente para confirmar recepción
+            sendACK(fromId);
             
             return true;
         } else {
@@ -322,4 +390,44 @@ void printPacketStats() {
 
 String getLastPacketString() {
     return lastPacket;
+}
+
+// Función para enviar ACK (acknowledgment) después de procesar un mensaje exitosamente
+// Formato: ACK:FROM:localDeviceId;TO:remoteDeviceId
+void sendACK(const String& remoteDeviceId) {
+    // Construir mensaje ACK sin cifrar (para velocidad y simplicidad)
+    String ackMessage = "ACK:FROM:" + String(DEVICE_ID) + ";TO:" + remoteDeviceId;
+    
+    Serial.print("Enviando ACK: ");
+    Serial.println(ackMessage);
+    
+    // Asegurar que no estamos en modo RX antes de transmitir
+    WAITING_LORA = false;
+    
+    // Configurar modo TX
+    LT.setMode(MODE_STDBY_RC);
+    delay(10);
+    
+    // Configurar parámetros de transmisión
+    LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_TX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
+    
+    // Transmitir ACK
+    uint8_t ackLength = ackMessage.length();
+    uint8_t ackStatus = LT.transmitDaniela((uint8_t*)ackMessage.c_str(), ackLength, 5000, TXpower, WAIT_TX);
+    
+    if (ackStatus == 0) {
+        Serial.println("ACK enviado exitosamente");
+    } else {
+        Serial.print("Error al enviar ACK. Estado: ");
+        Serial.println(ackStatus);
+    }
+    
+    // Pequeño delay antes de volver a RX
+    delay(50);
+    
+    // Volver a modo RX para recibir más mensajes
+    LT.setMode(MODE_RX);
+    LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
+    LT.setRx(LORA_TIMEOUT);
+    WAITING_LORA = true; // Reactivar recepción
 }

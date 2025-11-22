@@ -52,8 +52,6 @@ extern LoRa loRa;
 
 // Estado global
 extern std::vector<int> lista_canciones;
-extern float batteryVoltage;
-extern int batteryPercent;
 
 extern bool TRANSMISION_COMPLETADA;
 extern bool TRANSMISION_FALLIDA;

@@ -15,6 +15,7 @@ uint8_t getLastPacketInfo(int8_t* rssi, int8_t* snr);
 void getPacketStats(uint32_t* packetCount, uint32_t* errorCount);
 void printPacketStats();
 String getLastPacketString();
+void sendACK(const String& remoteDeviceId);
 
 
 class LoRa {
