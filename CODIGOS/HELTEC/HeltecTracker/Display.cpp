@@ -357,6 +357,10 @@ void drawFolderScreen(bool firstDraw) {
   if (firstDraw) {
     st7735.st7735_fill_screen(ST7735_BLACK);
     drawMenuDots(SCREEN_MP3_FOLDER);
+    // Mostrar símbolo de desconexión si es necesario
+    if (diferencia > 10 && disconnectedScreenShown) {
+      drawDisconnectedIcon(120, 1);
+    }
     drawRoundedRectangle(30, 20, 100, 30, 4, MORADO);
     st7735.st7735_write_str(45, 31, "PLAYLIST", Font_7x10, ST7735_WHITE, MORADO);
     String folderNum = String(currentFolder);
@@ -382,6 +386,10 @@ void drawGPSScreen(bool firstDraw, bool updateLatitude, bool updateLongitude) {
       st7735.st7735_fill_screen(ST7735_BLACK);
 
       st7735.st7735_write_str(0, 0, "GPS Dispositivo", Font_7x10, ST7735_WHITE);
+      // Mostrar símbolo de desconexión si es necesario
+      if (diferencia > 10 && disconnectedScreenShown) {
+        drawDisconnectedIcon(120, 1);
+      }
       // Mostrar coordenadas disponibles
       st7735.st7735_write_str(0, 20, "Latitud:", Font_7x10, ST7735_GREEN);
       st7735.st7735_write_str(0, 35, latitude.c_str(), Font_7x10, ST7735_WHITE);
@@ -447,6 +455,10 @@ void drawMP3Screen(bool firstDraw) {
   if (firstDraw) {
 
     st7735.st7735_fill_screen(ST7735_BLACK);
+    // Mostrar símbolo de desconexión si es necesario
+    if (diferencia > 10 && disconnectedScreenShown) {
+      drawDisconnectedIcon(120, 1);
+    }
     lastVolume = 255;
     lastOption = MP3_OPTION_COUNT;
     lastPlayingState = !isPlaying;
@@ -503,6 +515,10 @@ void drawMP3Screen(bool firstDraw) {
 void drawMonitoringScreen() {
   st7735.st7735_fill_screen(ST7735_BLACK);
   st7735.st7735_write_str(0, 0, "Monitoreo:", Font_7x10, ST7735_WHITE);
+  // Mostrar símbolo de desconexión si es necesario
+  if (diferencia > 10 && disconnectedScreenShown) {
+    drawDisconnectedIcon(120, 1);
+  }
   const char* statusText = isMonitoringActive ? "Activo" : "No Activo";
   st7735.st7735_write_str(70, 0, statusText, Font_7x10, isMonitoringActive ? ST7735_GREEN : ST7735_RED);
   int y_offset = 15;
@@ -521,19 +537,70 @@ void drawMonitoringScreen() {
   drawMenuDots(SCREEN_MONITORING);
 }
 
-void drawInfoScreen() {
-  st7735.st7735_fill_screen(ST7735_BLACK);
-  st7735.st7735_write_str(0, 0, "SafeRun Tracker", Font_7x10, ST7735_WHITE);
-  st7735.st7735_write_str(0, 15, "Dispositivo Remoto", Font_7x10, ST7735_GREEN);
-
-
-  st7735.st7735_write_str(0, 50, "Estado:", Font_7x10, ST7735_WHITE);
-  const char* statusText = isMonitoringActive ? "Activo" : "Inactivo";
-  uint16_t statusColor = isMonitoringActive ? ST7735_GREEN : ST7735_RED;
-  st7735.st7735_write_str(50, 50, statusText, Font_7x10, statusColor);
-
-  // Instrucciones
-  st7735.st7735_write_str(0, 70, "Long Sel: Menu", Font_7x10, ST7735_GRAY);
+void drawInfoScreen(bool firstDraw) {
+  static int lastDiferencia = -1;
+  static bool lastShouldShowIcon = false;
+  static MenuScreen lastScreen = SCREEN_COUNT;
+  
+  // Verificar si es la primera vez que se dibuja esta pantalla o si se cambió de pantalla
+  // Usar currentScreen para detectar cuando se entra a esta pantalla desde otra
+  bool screenChanged = (lastScreen != SCREEN_INFO && currentScreen == SCREEN_INFO);
+  bool isFirstDraw = firstDraw || screenChanged;
+  
+  // Verificar si diferencia cambió
+  bool diferenciaChanged = (diferencia != lastDiferencia);
+  
+  // Verificar si el estado del símbolo de desconexión cambió
+  bool shouldShowIcon = (diferencia > 3 && disconnectedScreenShown);
+  bool disconnectedIconChanged = (shouldShowIcon != lastShouldShowIcon);
+  
+  // Solo procesar si estamos en la pantalla de info
+  if (currentScreen == SCREEN_INFO) {
+    if (isFirstDraw || diferenciaChanged || disconnectedIconChanged) {
+      if (isFirstDraw) {
+        st7735.st7735_fill_screen(ST7735_BLACK);
+        st7735.st7735_write_str(0, 0, "SafeRun Tracker", Font_7x10, ST7735_WHITE);
+        st7735.st7735_write_str(0, 15, "Dispositivo Remoto", Font_7x10, ST7735_GREEN);
+        st7735.st7735_write_str(0, 30, "No delivered", Font_7x10, ST7735_WHITE);
+        st7735.st7735_write_str(0, 50, "Estado:", Font_7x10, ST7735_WHITE);
+        st7735.st7735_write_str(0, 70, "Long Sel: Menu", Font_7x10, ST7735_GRAY);
+      }
+      
+      // Actualizar símbolo de desconexión si cambió o es primera vez
+      if (isFirstDraw || disconnectedIconChanged) {
+        // Limpiar área del icono
+        st7735.st7735_fill_rectangle(120, 1, 15, 15, ST7735_BLACK);
+        if (shouldShowIcon) {
+          drawDisconnectedIcon(120, 1);
+        }
+        lastShouldShowIcon = shouldShowIcon;
+      }
+      
+      // Actualizar valor de diferencia si cambió o es primera vez
+      if (isFirstDraw || diferenciaChanged) {
+        // Limpiar área del valor de diferencia
+        st7735.st7735_fill_rectangle(90, 30, 40, 10, ST7735_BLACK);
+        String stringDiferencia = String(diferencia);
+        st7735.st7735_write_str(90, 30, stringDiferencia.c_str(), Font_7x10, ST7735_RED);
+        lastDiferencia = diferencia;
+      }
+      
+      // Actualizar estado de monitoreo (siempre en primera vez)
+      if (isFirstDraw) {
+        const char* statusText = isMonitoringActive ? "Activo" : "Inactivo";
+        uint16_t statusColor = isMonitoringActive ? ST7735_GREEN : ST7735_RED;
+        st7735.st7735_write_str(50, 50, statusText, Font_7x10, statusColor);
+      }
+    }
+    
+    // Actualizar lastScreen cuando estamos en esta pantalla
+    lastScreen = SCREEN_INFO;
+  } else {
+    // Si salimos de la pantalla de info, actualizar lastScreen
+    if (lastScreen == SCREEN_INFO) {
+      lastScreen = currentScreen;
+    }
+  }
 }
 
 // ====== Nuevas pantallas ======
@@ -545,6 +612,10 @@ void drawExerciseScreen(bool firstDraw) {
     st7735.st7735_fill_screen(ST7735_BLACK);
     //drawHeaderWithWiFi("EJERCICIO");
     st7735.st7735_write_str(45, 5, "EJERCICIO", Font_7x10, ST7735_WHITE);
+    // Mostrar símbolo de desconexión si es necesario
+    if (diferencia > 10 && disconnectedScreenShown) {
+      drawDisconnectedIcon(120, 1);
+    }
   }
   unsigned long now = millis();
   //st7735.st7735_write_str(0, 16, isMonitoringActive ? "Estado: Grabando" : "Estado: En pausa", Font_7x10, isMonitoringActive ? ST7735_GREEN : ST7735_GRAY);
@@ -596,6 +667,23 @@ void drawEmergencyScreen(bool firstDraw) {
       st7735.st7735_write_str(5, 60, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);
       st7735.st7735_write_str(25, 70, "para pedir apagar", Font_7x10, ST7735_WHITE);
     }
+  }
+}
+
+void drawDisconnectedScreen(bool firstDraw) {
+  if (firstDraw) {
+    st7735.st7735_fill_screen(ST7735_BLACK);
+    st7735.st7735_write_str(40, 5, "DESCONECTADO", Font_7x10, ST7735_RED);
+    
+    // Dibujar un rectángulo con borde rojo para indicar alerta
+    drawRoundedRectangle(10, 20, 140, 50, 4, ST7735_RED);
+    
+    // Mensaje principal
+    st7735.st7735_write_str(41, 30, "Dispositivo", Font_7x10, ST7735_WHITE,ST7735_RED);
+    st7735.st7735_write_str(39, 40, "desconectado", Font_7x10, ST7735_WHITE,ST7735_RED);
+    st7735.st7735_write_str(39, 50, "del receptor", Font_7x10, ST7735_WHITE,ST7735_RED);
+    
+
   }
 }
 
@@ -796,6 +884,11 @@ void drawHeaderWithWiFi(const String& title) {
   bool wifiStatus = false;  // No WiFi en dispositivo remoto
   drawWiFiIcon(140, 1, wifiStatus);
 
+  // Draw disconnected icon if diferencia > 10 and screen was already shown
+  if (diferencia > 10 && disconnectedScreenShown) {
+    drawDisconnectedIcon(120, 1);
+  }
+
   // Draw title
   st7735.st7735_write_str(0, 0, title.c_str(), Font_7x10, ST7735_WHITE);
 }
@@ -814,6 +907,15 @@ void drawWiFiIcon(int x, int y, bool connected) {
     drawLine(x + 2, y + 2, x + 10, y + 10, ST7735_RED);
     drawLine(x + 10, y + 2, x + 2, y + 10, ST7735_RED);
   }
+}
+
+void drawDisconnectedIcon(int x, int y) {
+  // Dibujar un símbolo de desconexión (X roja con círculo)
+  // Círculo exterior
+  drawCircleOutline(x + 6, y + 6, 5, ST7735_RED);
+  // X en el centro
+  drawLine(x + 3, y + 3, x + 9, y + 9, ST7735_RED);
+  drawLine(x + 9, y + 3, x + 3, y + 9, ST7735_RED);
 }
 
 // Helper to draw slightly bolder text by overdrawing with 1px offset

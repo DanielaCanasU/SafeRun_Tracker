@@ -86,7 +86,7 @@ void DetectorCaida::checkStatus(){
       if (activ.isFreeFall) { Serial.println("Free Fall Detected!"); free_fall = true; time_of_fall = millis(); } //Caida libre detectada
       if (activ.isActivity && free_fall ||activ.isActivity && impacto) { segunda_condicion_caida = true; tiempo_de_choque_piso = millis(); } //Impacto despues de la caida libre o impacto antes de la caida libre
       if ((millis() - tiempo_de_choque_piso >= ventana_choque_a_inactividad) && (segunda_condicion_caida)) { segunda_condicion_caida = false; tiempo_de_choque_piso = 0; } //Si ya pasó mucho tiempo no hubo inactividad despues de choque
-      if ((activ.isInactivity && segunda_condicion_caida && !isPersonStanding()) || (activ.isInactivity && impacto && !isPersonStanding())) { emergencia = true; currentScreen = SCREEN_EMERGENCY; drawEmergencyScreen(true)@;}
+      if ((activ.isInactivity && segunda_condicion_caida && !isPersonStanding()) || (activ.isInactivity && impacto && !isPersonStanding())) { emergencia = true; currentScreen = SCREEN_EMERGENCY; drawEmergencyScreen(true);}
    //Si se realizaron las 3 condiciones, emergencia 
       sensors_event_t event; acelerometro.getEvent(&event); x = event.acceleration.x; y = event.acceleration.y; z = event.acceleration.z; time_dato += 0.025;
       readAcelerometroData();

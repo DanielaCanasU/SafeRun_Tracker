@@ -147,7 +147,7 @@ void Botones::handleUserGestures(uint8_t button, bool isLongPress, bool isDouble
           break;
         case 3: // Info
           currentScreen = SCREEN_INFO;
-          drawInfoScreen();
+          drawInfoScreen(true);
           break;
         case 4: // Ejercicio
           currentScreen = SCREEN_EXERCISE;
@@ -180,6 +180,10 @@ void Botones::handleUserGestures(uint8_t button, bool isLongPress, bool isDouble
   if (button == BUTTON_SELECT) {
     if (isLongPress) {
       // Volver al menú principal desde cualquier pantalla
+      // Si estaba en pantalla de desconexión, marcar que ya se mostró
+      if (currentScreen == SCREEN_DISCONNECTED) {
+        disconnectedScreenShown = true;
+      }
       lastRenderedScreen = currentScreen;
       currentScreen = SCREEN_MAIN_MENU;
       drawMainMenu();
@@ -189,6 +193,13 @@ void Botones::handleUserGestures(uint8_t button, bool isLongPress, bool isDouble
     } else if (isDoubleClick) {
       if (currentScreen == SCREEN_MP3_PLAYER) { dfPlayer.enableLoop(); drawMP3Screen(); }
     } else {
+      // Si está en pantalla de desconexión y presiona cualquier botón, marcar que ya se mostró
+      if (currentScreen == SCREEN_DISCONNECTED && !isLongPress) {
+        disconnectedScreenShown = true;
+        currentScreen = SCREEN_MAIN_MENU;
+        drawMainMenu();
+        return;
+      }
       if (currentScreen == SCREEN_MP3_PLAYER) {
         switch (currentMP3Option) {
           case MP3_PLAY_PAUSE:

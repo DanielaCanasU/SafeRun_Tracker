@@ -1828,15 +1828,15 @@ uint8_t SX126XLT::receive(uint8_t *rxbuffer, uint8_t size, uint32_t rxtimeout, u
   uint16_t regdata;
   uint8_t buffer[2];
 
-  setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);  //set for IRQ on RX done or timeout
-  setRx(rxtimeout);
+  //setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);  //set for IRQ on RX done or timeout
+  //setRx(rxtimeout);
 
   if (!wait)
   {
     return 0;                             //not wait requested so no packet length to pass
   }
 
-  while (!digitalRead(_RXDonePin));       //Wait for DIO1 to go high
+  //while (!digitalRead(_RXDonePin));       //Wait for DIO1 to go high
 
   setMode(MODE_STDBY_RC);                 //ensure to stop further packet reception
 

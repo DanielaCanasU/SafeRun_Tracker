@@ -32,11 +32,13 @@ extern bool GPSLISTO;
 bool GPSLISTO = false;
 extern bool firstplay;
 bool firstplay = false;
+bool disconnectedScreenShown = false;
 bool TRANSMISION_COMPLETADA = true;
 bool TRANSMISION_FALLIDA = false;
 
 uint32_t TXPacketCount = 0;
 unsigned long lastSendTime_LoRa = 0;
+unsigned long inicioEsperaACK = 0;
 
 unsigned long lastSendTime_GPS = 0;
 String latitude = "";
@@ -44,6 +46,9 @@ String longitude = "";
 String time_str = "";
 bool gpsDataValid = false;
 unsigned long lastGPSUpdate = 0;
+bool waitingACK = false;
+bool receivedACK = false;
+int diferencia = 0;
 
 float x = 0, y = 0, z = 0;
 float time_dato = 0;

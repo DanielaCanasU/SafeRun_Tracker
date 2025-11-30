@@ -30,8 +30,6 @@ void setup() {
   loRa.init();
   detectorCaida.init();
   analogReadResolution(12);
-  // Transición automática: dibujar menú principal completo
-  display.drawMenu(SCREEN_MAIN_MENU, true);
 }
 
 void loop() {
@@ -41,6 +39,44 @@ void loop() {
   botones.checkUserEntry();
 
   
+  // Verificar si hay desconexión (diferencia > 10)
+  if (diferencia > 3) {
+    if (!disconnectedScreenShown && currentScreen != SCREEN_DISCONNECTED) {
+      // Mostrar pantalla de desconexión solo la primera vez
+      currentScreen = SCREEN_DISCONNECTED;
+      drawDisconnectedScreen(true);
+      disconnectedScreenShown = true;
+    }
+    // Si el usuario ya salió de la pantalla, solo mostrar el símbolo (se maneja en los headers)
+  } else {
+    // Si se reconecta (diferencia <= 10)
+    if (disconnectedScreenShown) {
+      disconnectedScreenShown = false;
+      // Si estaba en pantalla de desconexión, volver al menú principal
+      if (currentScreen == SCREEN_DISCONNECTED) {
+        currentScreen = SCREEN_MAIN_MENU;
+        display.drawMenu(SCREEN_MAIN_MENU, true);
+      } else {
+        // Redibujar la pantalla actual para quitar el símbolo
+        if (currentScreen == SCREEN_MAIN_MENU) {
+          display.drawMenu(SCREEN_MAIN_MENU, true);
+        } else if (currentScreen == SCREEN_GPS) {
+          drawGPSScreen(true);
+        } else if (currentScreen == SCREEN_MP3_FOLDER) {
+          drawFolderScreen(true);
+        } else if (currentScreen == SCREEN_MP3_PLAYER) {
+          drawMP3Screen(true);
+        } else if (currentScreen == SCREEN_MONITORING) {
+          drawMonitoringScreen();
+        } else if (currentScreen == SCREEN_INFO) {
+          drawInfoScreen(true);
+        } else if (currentScreen == SCREEN_EXERCISE) {
+          drawExerciseScreen(true);
+        }
+      }
+    }
+  }
+
   // Pantallas según menú
   if (currentScreen == SCREEN_MAIN_MENU) {
     // El menú principal no necesita actualizaciones constantes
@@ -53,23 +89,26 @@ void loop() {
   } else if (currentScreen == SCREEN_MONITORING) {
     handleMonitoringScreen();
   } else if (currentScreen == SCREEN_INFO) {
-    // La pantalla de info no necesita actualizaciones constantes
+    // La pantalla de info se actualiza cuando diferencia cambia
+    drawInfoScreen();
   }
   else if (currentScreen == SCREEN_EXERCISE) {
     handleExerciseScreen();
+  } else if (currentScreen == SCREEN_DISCONNECTED) {
+    // La pantalla de desconexión no necesita actualizaciones constantes
   }
 
   detectorCaida.checkStatus();
   
-  
-  // Monitoreo acelerómetro
-  //accelLoop();
-
   // GPS feed
   getGpsData();
   // Envío periódico por LoRa (siempre). El contenido incluye GPS solo cuando isMonitoringActive == true
-  if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa)) {
-    lastSendTime_LoRa = currentTime;
+  //ENVIAR DATOS
+  //if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack || !TRANSMISION_COMPLETADA)) {
+  if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack)) {
+
+    //lastSendTime_LoRa = currentTime;
+    
     char message[128];
     int len = 0;
     if (isMonitoringActive) {
@@ -92,10 +131,20 @@ void loop() {
       message[len] = '*';
       message[len + 1] = '\0';
     }
-    sendMessage(message, true);
+    loRa.sendMessage(message, false);
+    //LT.setMode(MODE_STDBY_RC);
+
+    //LT.setRx(100);
   }
 
-
+  if(waitingACK && ((currentTime - lastSendTime_LoRa) < 30000)) {
+    receivedACK = loRa.checkIncomeMessage();
+    waitingACK = !receivedACK;
+    if (!waitingACK) { 
+      Serial.println("SI LLEGO ACK");
+    
+    }
+  }
 }
 
 

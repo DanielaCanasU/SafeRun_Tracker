@@ -31,4 +31,4 @@ const uint8_t Optimisation = LDRO_AUTO;
 const int8_t TXpower = 22;
 const uint16_t packet_delay = 1000;
 
-
+const uint16_t RXBUFFER_SIZE = 200;

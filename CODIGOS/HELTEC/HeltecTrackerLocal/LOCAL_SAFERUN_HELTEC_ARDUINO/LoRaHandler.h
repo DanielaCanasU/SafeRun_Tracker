@@ -27,4 +27,6 @@ class LoRa {
         LoRa();
         void init();
         void checkIncomeMessage();
+        int lastACKreceived = 0;
+        String lastFromID = "";
 };

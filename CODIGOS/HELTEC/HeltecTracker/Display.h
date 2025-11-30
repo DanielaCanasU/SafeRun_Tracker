@@ -21,9 +21,10 @@ void updateGPSFieldsIfChanged(const String& newTime, const String& newLat, const
 void drawFolderScreen(bool firstDraw = false);
 void drawMP3Screen(bool firstDraw = false);
 void drawMonitoringScreen();
-void drawInfoScreen();
+void drawInfoScreen(bool firstDraw = true);
 void drawExerciseScreen(bool firstDraw = true);
 void drawEmergencyScreen(bool firstDraw = true);
+void drawDisconnectedScreen(bool firstDraw = true);
 
 // API para popup de caida
 void notifyFallDetected();
@@ -37,6 +38,7 @@ void drawCircle(int x, int y, int radius, uint16_t color);
 void drawCircleOutline(int xc, int yc, int r, uint16_t color);
 void fillRectPixels(int x, int y, int w, int h, uint16_t color);
 void drawWiFiIcon(int x, int y, bool connected);
+void drawDisconnectedIcon(int x, int y);
 
 // Iconos
 void drawMinusIcon(uint16_t x, uint16_t y, uint16_t color, uint8_t size);

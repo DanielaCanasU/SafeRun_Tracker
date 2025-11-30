@@ -45,7 +45,13 @@ void loop() {
     unsigned long now = millis();
     static int lastSensor4 = 0;
     //Chequeo de subsistemas
-    lora.checkIncomeMessage();
+    if (ACKenviado) {
+        lora.checkIncomeMessage();
+    }
+    else {
+        sendACK(lora.lastFromID);
+    }
+    
     geolocation.getGpsData();
     display.updateUI(now);
 

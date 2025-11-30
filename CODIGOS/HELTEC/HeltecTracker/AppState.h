@@ -23,7 +23,7 @@ class Bateria;
 #define ST7735_GRAY ST7735_COLOR565(128, 128, 128)
 
 // Menú y opciones MP3
-enum MenuScreen { SCREEN_MAIN_MENU, SCREEN_GPS, SCREEN_MP3_FOLDER, SCREEN_MP3_PLAYER, SCREEN_MONITORING, SCREEN_INFO, SCREEN_EXERCISE, SCREEN_EMERGENCY, SCREEN_COUNT };
+enum MenuScreen { SCREEN_MAIN_MENU, SCREEN_GPS, SCREEN_MP3_FOLDER, SCREEN_MP3_PLAYER, SCREEN_MONITORING, SCREEN_INFO, SCREEN_EXERCISE, SCREEN_EMERGENCY, SCREEN_DISCONNECTED, SCREEN_COUNT };
 enum MP3Option { MP3_PLAY_PAUSE, MP3_NEXT, MP3_VOL_UP, MP3_VOL_DOWN, MP3_PREV, MP3_OPTION_COUNT };
 
 // Estado botones
@@ -59,6 +59,9 @@ extern bool TRANSMISION_FALLIDA;
 // LoRa
 extern uint32_t TXPacketCount;
 extern unsigned long lastSendTime_LoRa;
+extern bool waitingACK;
+extern bool receivedACK;
+extern int diferencia;
 
 // GPS
 extern unsigned long lastSendTime_GPS;
@@ -67,6 +70,7 @@ extern String longitude;
 extern String time_str;
 extern bool gpsDataValid;
 extern unsigned long lastGPSUpdate;
+
 
 // Acelerómetro y monitoreo
 extern float x, y, z;
@@ -114,3 +118,4 @@ extern bool emergencyConfirmDeactivate;
 
 extern bool GPSLISTO;  // Flag para indicar si el DFPlayer está listo
 extern bool firstplay;
+extern bool disconnectedScreenShown;  // Flag para indicar si ya se mostró la pantalla de desconexión

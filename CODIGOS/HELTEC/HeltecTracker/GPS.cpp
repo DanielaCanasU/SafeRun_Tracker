@@ -24,7 +24,7 @@ void Geolocation::init(){
   // Inicializar variables de estado
   gpsDataValid = false;
   lastGPSUpdate = 0;
-  while (!gpsDataValid && (millis() - startTime < 60000)) { // 60 segundos de timeout
+  while (!gpsDataValid && (millis() - startTime < 600)) { // 60 segundos de timeout
     getGpsData();
     
     if (gps.location.isValid() && 
@@ -84,7 +84,7 @@ void getGpsData() {
       if (coordsValid) {
         gpsDataValid = true;
         lastGPSUpdate = millis();
-        Serial.println("GPS: Coordenadas válidas obtenidas");
+        //Serial.println("GPS: Coordenadas válidas obtenidas");
       } else {
         // Si no hay coordenadas válidas por más de 30 segundos, marcar como inválido
         if (millis() - lastGPSUpdate > 30000) {
@@ -98,8 +98,8 @@ void getGpsData() {
       latitude = new_latitude;
       longitude = new_longitude;
       */
-      Serial.println("GPS: Datos actualizados");
-      Serial.println(new_latitude);
+      //Serial.println("GPS: Datos actualizados");
+      //Serial.println(new_latitude);
 
       // Redibujar pantalla GPS si está activa
       updateGPSFieldsIfChanged(new_time_str, new_latitude, new_longitude);

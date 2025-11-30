@@ -4,7 +4,8 @@
 
 
 // Temporizadores (ms)
-inline constexpr unsigned long sendInterval_LoRa = 1000;   // 1s
+inline constexpr unsigned long sendInterval_LoRa_receive_ack = 10000;   // 30s
+inline constexpr unsigned long sendInterval_LoRa_send_data = 1000;   // 1s
 inline constexpr unsigned long sendInterval_GPS = 1000;    // 1s
 inline constexpr unsigned long timerDelay_Acelerometro = 25; // 25ms
 
@@ -16,6 +17,9 @@ inline constexpr unsigned long DEBOUNCE_TIME    = 300;
 inline constexpr unsigned long TRIPLE_CLICK_TIME = 600;  
 inline constexpr unsigned long CLICK_TIMEOUT     = 400;  
 inline constexpr unsigned long VOLUME_UPDATE_INTERVAL = 200;
+
+extern const unsigned long LORA_TIMEOUT;
+
 
 // IDs de dispositivo LoRa
 #define DEVICE_ID "001"  // ID del dispositivo remoto (HeltecTracker)
