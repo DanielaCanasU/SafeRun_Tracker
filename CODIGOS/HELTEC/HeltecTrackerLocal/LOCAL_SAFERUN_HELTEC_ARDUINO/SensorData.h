@@ -15,6 +15,18 @@ struct SensorData {
   float accelX, accelY, accelZ;
 };
 
+struct Waypoint {
+  float latitude;
+  float longitude;
+  String name;
+  unsigned long timestamp;
+  bool isValid;
+};
+
+const int MAX_WAYPOINTS = 30;
+extern Waypoint waypoints[MAX_WAYPOINTS];
+extern int waypointCount;
+
 class Data {
   private:
     int numero;

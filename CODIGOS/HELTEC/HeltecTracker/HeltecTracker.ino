@@ -90,7 +90,7 @@ void loop() {
     handleMonitoringScreen();
   } else if (currentScreen == SCREEN_INFO) {
     // La pantalla de info se actualiza cuando diferencia cambia
-    drawInfoScreen();
+    drawInfoScreen(false);
   }
   else if (currentScreen == SCREEN_EXERCISE) {
     handleExerciseScreen();
@@ -105,13 +105,13 @@ void loop() {
   // Envío periódico por LoRa (siempre). El contenido incluye GPS solo cuando isMonitoringActive == true
   //ENVIAR DATOS
   //if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack || !TRANSMISION_COMPLETADA)) {
-  if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack)) {
+  if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack) && (isMonitoringActive || detectorCaida.emergencia)) {
 
     //lastSendTime_LoRa = currentTime;
     
     char message[128];
     int len = 0;
-    if (isMonitoringActive) {
+    //if (isMonitoringActive || detectorCaida.emergencia) {
 
       len = snprintf(message, sizeof(message),
                      "GPS:%s,%s; ST:%d,%d,%d,%d,%d",
@@ -119,14 +119,14 @@ void loop() {
                      1, detectorCaida.impacto ? 1 : 0,
                      detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
                      detectorCaida.emergencia ? 1 : 0);
-    } else {
+    /*} else {
 
       len = snprintf(message, sizeof(message),
                      "ST:%d,%d,%d,%d,%d",
                      0, detectorCaida.impacto ? 1 : 0,
                      detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
                      detectorCaida.emergencia ? 1 : 0);
-    }
+    }*/
     if (len > 0 && len < (int)sizeof(message) - 1) {
       message[len] = '*';
       message[len + 1] = '\0';
@@ -137,12 +137,11 @@ void loop() {
     //LT.setRx(100);
   }
 
-  if(waitingACK && ((currentTime - lastSendTime_LoRa) < 30000)) {
+  if(waitingACK && ((currentTime - lastSendTime_LoRa) < 30000) && (isMonitoringActive || detectorCaida.emergencia)) {
     receivedACK = loRa.checkIncomeMessage();
     waitingACK = !receivedACK;
     if (!waitingACK) { 
       Serial.println("SI LLEGO ACK");
-    
     }
   }
 }

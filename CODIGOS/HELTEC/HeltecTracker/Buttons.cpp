@@ -182,7 +182,7 @@ void Botones::handleUserGestures(uint8_t button, bool isLongPress, bool isDouble
       // Volver al menú principal desde cualquier pantalla
       // Si estaba en pantalla de desconexión, marcar que ya se mostró
       if (currentScreen == SCREEN_DISCONNECTED) {
-        disconnectedScreenShown = true;
+        //disconnectedScreenShown = true;
       }
       lastRenderedScreen = currentScreen;
       currentScreen = SCREEN_MAIN_MENU;

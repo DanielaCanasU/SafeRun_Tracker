@@ -102,19 +102,8 @@ static float localLongitude = 0.0f;
 static bool localPositionSet = false;
 static unsigned long lastLocalGPSUpdate = 0;
 
-// Estructura para waypoints del backtrack
-struct Waypoint {
-  float latitude;
-  float longitude;
-  String name;
-  unsigned long timestamp;
-  bool isValid;
-};
-
-// Sistema de backtrack
-static const int MAX_WAYPOINTS = 30;
-static Waypoint waypoints[MAX_WAYPOINTS];
-static int waypointCount = 0;
+// Estructura para waypoints del backtrack - ahora definida en SensorData.h
+// Sistema de backtrack - waypoints y waypointCount ahora son globales desde SensorData.h/cpp
 static int selectedWaypointIndex = -1;
 
 // Variables de scroll para waypoints
@@ -863,8 +852,8 @@ static void renderLocalData() {
     st7735.st7735_write_str(0, 40, buf, Font_7x10, ST7735_WHITE);
     snprintf(buf, sizeof(buf), "RSSI:%d SNR:%d", lastLoRaData.rssi, lastLoRaData.snr);
     st7735.st7735_write_str(0, 52, buf, Font_7x10, ST7735_WHITE);
-    snprintf(buf, sizeof(buf), "Recibido: %lus", lastLoRaReceived / 1000);
-    st7735.st7735_write_str(0, 64, buf, Font_7x10, ST7735_GRAY);
+    //snprintf(buf, sizeof(buf), "Recibido: %lus", lastLoRaReceived / 1000);
+    //st7735.st7735_write_str(0, 64, buf, Font_7x10, ST7735_GRAY);
 
     if (datosRecibidos) { 
       datosRecibidos = false;
@@ -980,12 +969,12 @@ static void renderPairing() {
 
 // Pantalla de gestión de waypoints
 static void renderWaypointManager() {
+  loadWaypointsFromStorage();
   if (lastRenderedScreen != MenuScreen::WaypointManager) {
     drawHeaderWithWiFi("Gestionar Puntos");
     lastRenderedScreen = MenuScreen::WaypointManager;
-    
     // Inicializar preferencias si no están listas
-    initWaypointPrefs();
+    //initWaypointPrefs();
   }
   
   // Sistema de scroll para waypoints (mostrar solo 3 por pantalla)

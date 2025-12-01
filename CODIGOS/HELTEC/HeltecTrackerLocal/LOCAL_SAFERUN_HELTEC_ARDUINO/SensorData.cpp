@@ -2,18 +2,9 @@
 #include <Preferences.h>
 #include "Config.h"
 
-// Estructura para waypoints del backtrack
-struct Waypoint {
-  float latitude;
-  float longitude;
-  String name;
-  unsigned long timestamp;
-  bool isValid;
-};
-
-static const int MAX_WAYPOINTS = 30;
-static int waypointCount = 0;
-static Waypoint waypoints[MAX_WAYPOINTS];
+// Quitar definición duplicada de struct Waypoint, MAX_WAYPOINTS (usan el header)
+int waypointCount = 0;
+Waypoint waypoints[MAX_WAYPOINTS];
 
 
 Data::Data() {}
@@ -89,6 +80,8 @@ void loadWaypointsFromStorage() {
     waypoints[i].name = waypointPrefs.getString((prefix + "name").c_str(), "Punto " + String(i + 1));
     waypoints[i].timestamp = waypointPrefs.getULong((prefix + "time").c_str(), 0);
     waypoints[i].isValid = true;
+
+    Serial.println("Waypoint " + String(i) + ": " + waypoints[i].name + " - " + String(waypoints[i].latitude) + ", " + String(waypoints[i].longitude));
   }
   waypointPrefs.end();
 }

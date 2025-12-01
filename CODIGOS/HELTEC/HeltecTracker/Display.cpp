@@ -655,6 +655,7 @@ void drawEmergencyScreen(bool firstDraw) {
   }
   if (!detectorCaida.emergencia) {
     drawRoundedRectangle(22, 20, 115, 30, 4, ST7735_GREEN);
+    st7735.st7735_write_str(40, 28, "A SALVO", Font_11x18, ST7735_BLACK, ST7735_GREEN);
     st7735.st7735_write_str(5, 60, "Mantener 3 botones 3s", Font_7x10, ST7735_WHITE);
     st7735.st7735_write_str(25, 70, "para enviar SOS", Font_7x10, ST7735_WHITE);
   } else {
@@ -882,7 +883,7 @@ void drawHeaderWithWiFi(const String& title) {
 
   // Draw WiFi icon in top right as status bar
   bool wifiStatus = false;  // No WiFi en dispositivo remoto
-  drawWiFiIcon(140, 1, wifiStatus);
+  //drawWiFiIcon(140, 1, wifiStatus);
 
   // Draw disconnected icon if diferencia > 10 and screen was already shown
   if (diferencia > 10 && disconnectedScreenShown) {
@@ -913,7 +914,7 @@ void drawDisconnectedIcon(int x, int y) {
   // Dibujar un símbolo de desconexión (X roja con círculo)
   // Círculo exterior
   drawCircleOutline(x + 6, y + 6, 5, ST7735_RED);
-  // X en el centro
+  // X en el centro 
   drawLine(x + 3, y + 3, x + 9, y + 9, ST7735_RED);
   drawLine(x + 9, y + 3, x + 3, y + 9, ST7735_RED);
 }
