@@ -38,9 +38,24 @@ void loop() {
   //Manejar si el usuario utilizó algún botón
   botones.checkUserEntry();
 
+  // Detectar cambio de isMonitoringActive de true a false
+  if (prev_isMonitoringActive && !isMonitoringActive) {
+    // Cambió de true a false, necesitamos enviar mensaje de fin
+    waitingEndMonitoringACK = true;
+    endMonitoringACKNumber = -1; // Resetear para que se guarde el número correcto en el primer envío
+    lastSendTime_LoRa = 0; // Forzar envío inmediato
+  }
+  // Si vuelve a activarse, cancelar la espera del mensaje de fin
+  if (!prev_isMonitoringActive && isMonitoringActive) {
+    waitingEndMonitoringACK = false;
+    endMonitoringACKNumber = -1; // Resetear el número de ACK
+  }
+  // Actualizar estado anterior
+  prev_isMonitoringActive = isMonitoringActive;
+
   
   // Verificar si hay desconexión (diferencia > 10)
-  if (diferencia > 3) {
+  if (diferencia > 10) {
     if (!disconnectedScreenShown && currentScreen != SCREEN_DISCONNECTED) {
       // Mostrar pantalla de desconexión solo la primera vez
       currentScreen = SCREEN_DISCONNECTED;
@@ -102,42 +117,71 @@ void loop() {
   
   // GPS feed
   getGpsData();
-  // Envío periódico por LoRa (siempre). El contenido incluye GPS solo cuando isMonitoringActive == true
-  //ENVIAR DATOS
-  //if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack || !TRANSMISION_COMPLETADA)) {
-  if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack) && (isMonitoringActive || detectorCaida.emergencia)) {
-
-    //lastSendTime_LoRa = currentTime;
-    
+  
+  // Envío periódico por LoRa
+  // Caso 1: Esperando ACK del mensaje de fin de monitoreo
+  if (waitingEndMonitoringACK && (currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack)) {
+    // Guardar el número de ACK que se usará para este mensaje (antes de que sendMessage lo incremente)
+    if (endMonitoringACKNumber == -1) {
+      // Primera vez que enviamos el mensaje de fin, guardar el número de ACK
+      endMonitoringACKNumber = loRa.lastSendACK + 1;
+    }
+    // Enviar mensaje de fin de monitoreo con ST:0,0,0,0,0
     char message[128];
-    int len = 0;
-    //if (isMonitoringActive || detectorCaida.emergencia) {
-
-      len = snprintf(message, sizeof(message),
-                     "GPS:%s,%s; ST:%d,%d,%d,%d,%d",
-                     latitude.c_str(), longitude.c_str(),
-                     1, detectorCaida.impacto ? 1 : 0,
-                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
-                     detectorCaida.emergencia ? 1 : 0);
-    /*} else {
-
-      len = snprintf(message, sizeof(message),
-                     "ST:%d,%d,%d,%d,%d",
-                     0, detectorCaida.impacto ? 1 : 0,
-                     detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
-                     detectorCaida.emergencia ? 1 : 0);
-    }*/
+    int len = snprintf(message, sizeof(message),
+                       "GPS:%s,%s; ST:%d,%d,%d,%d,%d",
+                       latitude.c_str(), longitude.c_str(),
+                       0, 0, 0, 0, 0);
     if (len > 0 && len < (int)sizeof(message) - 1) {
       message[len] = '*';
       message[len + 1] = '\0';
     }
     loRa.sendMessage(message, false);
-    //LT.setMode(MODE_STDBY_RC);
-
-    //LT.setRx(100);
+  }
+  // Caso 2: Envío normal cuando isMonitoringActive está activo o hay emergencia
+  else if ((currentTime - lastSendTime_LoRa >= sendInterval_LoRa_receive_ack) && (isMonitoringActive || detectorCaida.emergencia)) {
+    char message[128];
+    int len = snprintf(message, sizeof(message),
+                       "GPS:%s,%s; ST:%d,%d,%d,%d,%d",
+                       latitude.c_str(), longitude.c_str(),
+                       1, detectorCaida.impacto ? 1 : 0,
+                       detectorCaida.free_fall ? 1 : 0, detectorCaida.segunda_condicion_caida ? 1 : 0,
+                       detectorCaida.emergencia ? 1 : 0);
+    if (len > 0 && len < (int)sizeof(message) - 1) {
+      message[len] = '*';
+      message[len + 1] = '\0';
+    }
+    loRa.sendMessage(message, false);
   }
 
-  if(waitingACK && ((currentTime - lastSendTime_LoRa) < 30000) && (isMonitoringActive || detectorCaida.emergencia)) {
+  // Verificar ACK para mensaje de fin de monitoreo
+  if (waitingEndMonitoringACK && waitingACK && ((currentTime - lastSendTime_LoRa) < 30000)) {
+    receivedACK = loRa.checkIncomeMessage();
+    if (receivedACK) {
+      // Verificar que el ACK recibido corresponda al mensaje de fin de monitoreo
+      // El ACK debe ser >= endMonitoringACKNumber (puede ser mayor si el receptor procesó mensajes adicionales)
+      if (endMonitoringACKNumber >= 0 && loRa.ultimoACK >= endMonitoringACKNumber) {
+        Serial.print("SI LLEGO ACK - Mensaje de fin de monitoreo (ACK: ");
+        Serial.print(loRa.ultimoACK);
+        Serial.print(", Esperado: >= ");
+        Serial.print(endMonitoringACKNumber);
+        Serial.println(")");
+        waitingACK = false;
+        waitingEndMonitoringACK = false; // ACK recibido, ya no necesitamos seguir enviando
+        endMonitoringACKNumber = -1; // Resetear el número de ACK
+      } else {
+        // El ACK recibido es de un mensaje anterior, seguir esperando
+        Serial.print("ACK recibido es de mensaje anterior. Esperado: >= ");
+        Serial.print(endMonitoringACKNumber);
+        Serial.print(", Recibido: ");
+        Serial.println(loRa.ultimoACK);
+        // Mantener waitingACK = true para seguir esperando
+      }
+    }
+    // Si receivedACK es false, no se recibió ningún mensaje, mantener waitingACK = true
+  }
+  // Verificar ACK para mensajes normales (solo si no estamos esperando ACK del mensaje de fin)
+  else if (!waitingEndMonitoringACK && waitingACK && ((currentTime - lastSendTime_LoRa) < 30000) && (isMonitoringActive || detectorCaida.emergencia)) {
     receivedACK = loRa.checkIncomeMessage();
     waitingACK = !receivedACK;
     if (!waitingACK) { 

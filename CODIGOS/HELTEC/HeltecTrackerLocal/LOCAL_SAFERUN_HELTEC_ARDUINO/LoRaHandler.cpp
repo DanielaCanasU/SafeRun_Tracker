@@ -446,7 +446,7 @@ void sendACK(const String& remoteDeviceId) {
             TRANSMISION_COMPLETADA = true;
             ACKenviado = true;
             lastSendTime_ACK = currentTime;
-            lora.lastACKreceived++;
+            //lora.lastACKreceived++;
             Serial.println("CORRECTA");
             //LT.setMode(MODE_STDBY_RC);
             //LT.setRx(10000);

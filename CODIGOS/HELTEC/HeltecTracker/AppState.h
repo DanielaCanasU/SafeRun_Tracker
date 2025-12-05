@@ -82,6 +82,9 @@ extern unsigned long ventana_caida_a_choque, ventana_choque_a_inactividad;
 //extern float initialX, initialY, initialZ;
 extern bool isCalibrated, isMonitoringActive;
 extern bool prev_impacto, prev_free_fall, prev_segunda_condicion_caida, prev_emergencia;
+extern bool prev_isMonitoringActive;  // Estado anterior de isMonitoringActive
+extern bool waitingEndMonitoringACK;  // Flag para indicar que estamos esperando ACK del mensaje de fin de monitoreo
+extern int endMonitoringACKNumber;    // Número de ACK usado en el mensaje de fin de monitoreo
 
 // Menú / MP3
 extern volatile bool menuNeedsUpdate;

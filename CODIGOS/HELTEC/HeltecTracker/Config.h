@@ -23,7 +23,7 @@ extern const unsigned long LORA_TIMEOUT;
 
 // IDs de dispositivo LoRa
 #define DEVICE_ID "001"  // ID del dispositivo remoto (HeltecTracker)
-#define TARGET_DEVICE_ID "456"  // ID del dispositivo destino (LOCAL_SAFERUN)
+#define TARGET_DEVICE_ID "A13X14"  // ID del dispositivo destino (LOCAL_SAFERUN)
 
 // ACK timeout en milisegundos
 inline constexpr unsigned long ACK_TIMEOUT = 1000;  // 1 segundo para esperar ACK

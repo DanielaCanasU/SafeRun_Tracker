@@ -60,6 +60,9 @@ unsigned long ventana_choque_a_inactividad = 7000;
 //float initialX = 0, initialY = 0, initialZ = 0;
 bool isCalibrated = false, isMonitoringActive = false;
 bool prev_impacto = false, prev_free_fall = false, prev_segunda_condicion_caida = false, prev_emergencia = false;
+bool prev_isMonitoringActive = false;  // Estado anterior de isMonitoringActive
+bool waitingEndMonitoringACK = false;  // Flag para indicar que estamos esperando ACK del mensaje de fin de monitoreo
+int endMonitoringACKNumber = -1;        // Número de ACK usado en el mensaje de fin de monitoreo (-1 = no hay mensaje pendiente)
 
 volatile bool menuNeedsUpdate = false;
 volatile bool needProcessButton = false;

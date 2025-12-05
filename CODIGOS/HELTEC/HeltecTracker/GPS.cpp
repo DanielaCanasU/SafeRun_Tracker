@@ -24,7 +24,7 @@ void Geolocation::init(){
   // Inicializar variables de estado
   gpsDataValid = false;
   lastGPSUpdate = 0;
-  while (!gpsDataValid && (millis() - startTime < 600)) { // 60 segundos de timeout
+  while (!gpsDataValid && (millis() - startTime < 60000)) { // 60 segundos de timeout
     getGpsData();
     
     if (gps.location.isValid() && 
