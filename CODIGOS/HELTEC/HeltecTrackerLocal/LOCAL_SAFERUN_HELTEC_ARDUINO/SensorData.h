@@ -27,6 +27,10 @@ const int MAX_WAYPOINTS = 30;
 extern Waypoint waypoints[MAX_WAYPOINTS];
 extern int waypointCount;
 
+// Configuración de distancia para ejercicio
+enum ExerciseDistance { DISTANCE_500M, DISTANCE_1KM, DISTANCE_1_5KM, DISTANCE_COUNT };
+extern ExerciseDistance selectedExerciseDistance;
+
 class Data {
   private:
     int numero;

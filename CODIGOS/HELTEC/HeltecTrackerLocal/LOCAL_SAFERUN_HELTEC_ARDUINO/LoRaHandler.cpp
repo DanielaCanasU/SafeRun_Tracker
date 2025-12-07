@@ -30,13 +30,15 @@ AES aes;
 LoRa::LoRa(){}
 
 void LoRa::init() {
+    // Solo inicializar hardware, NO configurar parámetros de modulación
+    // La configuración se hará cuando se seleccione la distancia en el menú
     SPI.begin();
     if (LT.begin(NSS, NRESET, RFBUSY, DIO1, LORA_DEVICE)) {
         Serial.println("--------------------------------");
         Serial.println("LORA INICIADO CORRECTAMENTE");
         Serial.println("--------------------------------");
         delay(1000);
-        LT.setMode(MODE_RX);
+        LT.setMode(MODE_STDBY_RC);
         LT.setRegulatorMode(USE_DCDC);
         LT.setPaConfig(0x04, PAAUTO, LORA_DEVICE);
         LT.setDIO3AsTCXOCtrl(TCXO_CTRL_3_3V);
@@ -45,12 +47,14 @@ void LoRa::init() {
         LT.setDIO2AsRfSwitchCtrl();
         LT.setPacketType(PACKET_TYPE_LORA);
         LT.setRfFrequency(Frequency, Offset);
-        LT.setModulationParams(SpreadingFactor, Bandwidth, CodeRate, Optimisation);
+        // NO configurar parámetros de modulación aquí - se hará en configureSX1262ForDistance()
         LT.setBufferBaseAddress(0, 0);
-        LT.setPacketParams(8, LORA_PACKET_VARIABLE_LENGTH, 255, LORA_CRC_ON, LORA_IQ_NORMAL);
-        LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
-        LT.setHighSensitivity();
-        LT.setSyncWord(LORA_MAC_PRIVATE_SYNCWORD);
+        // NO configurar packet params aquí - se hará en configureSX1262ForDistance()
+        // NO configurar IRQ params aquí - se hará en configureSX1262ForDistance()
+        // NO configurar sensitivity ni sync word aquí - se hará en configureSX1262ForDistance()
+        
+        // Configurar con la distancia por defecto al inicializar
+        configureSX1262ForDistance(selectedExerciseDistance);
     } else {
         Serial.println("--------------------------------");
         Serial.println("ERROR INICIANDO LORA");
@@ -62,6 +66,9 @@ void LoRa::checkIncomeMessage() {
     unsigned long now = millis();
     // LoRa reception logic (exactly like ESP32)
     if(!WAITING_LORA) {
+        // Asegurarse de que el radio esté en modo standby antes de configurar RX
+        LT.setMode(MODE_STDBY_RC);
+        delay(5);
         LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);  //set for IRQ on RX done or timeout
         LT.setRx(LORA_TIMEOUT);
         WAITING_LORA = true;
@@ -197,24 +204,81 @@ bool initLoRaHandler() {
 }
 
 void configureSX1262() {
-    //Setup LoRa device
-    LT.setMode(MODE_RX);
-    LT.setRegulatorMode(USE_DCDC);
-    LT.setPaConfig(0x04, PAAUTO, LORA_DEVICE);
-    LT.setDIO3AsTCXOCtrl(TCXO_CTRL_3_3V);
-    LT.calibrateDevice(ALLDevices);  //is required after setting TCXO
-    LT.calibrateImage(Frequency);
-    LT.setDIO2AsRfSwitchCtrl();
-    LT.setPacketType(PACKET_TYPE_LORA);
-    LT.setRfFrequency(Frequency, Offset);
-    LT.setModulationParams(SpreadingFactor, Bandwidth, CodeRate, Optimisation);
-    LT.setBufferBaseAddress(0, 0);
+    // Función legacy - ahora usa configureSX1262ForDistance con distancia por defecto
+    // Verificar que selectedExerciseDistance esté inicializado
+    if (selectedExerciseDistance >= DISTANCE_COUNT) {
+        selectedExerciseDistance = DISTANCE_1_5KM; // Valor por defecto seguro
+    }
+    configureSX1262ForDistance(selectedExerciseDistance);
+}
+
+void configureSX1262ForDistance(ExerciseDistance distance) {
+    // Verificar que distance esté en rango válido
+    if (distance >= DISTANCE_COUNT) {
+        Serial.println("ERROR: distance fuera de rango, usando 1.5km por defecto");
+        distance = DISTANCE_1_5KM;
+    }
+    
+    uint8_t sf;
+    uint8_t cr;
+    
+    // Configurar según la distancia seleccionada
+    // Usar valores que sabemos que funcionan (basados en las constantes existentes)
+    switch(distance) {
+        case DISTANCE_500M:
+            // 500m: SF más pequeño posible, CR 4/5
+            // Nota: Si LORA_SF5 no existe, usar valor numérico 5
+            sf = LORA_SF5;
+            cr = LORA_CR_4_5;
+            Serial.println("Configurando SX1262 para 500m: SF5, CR 4/5");
+            break;
+        case DISTANCE_1KM:
+            // 1km: SF 10, CR 4/5
+            // Nota: Si LORA_SF10 no existe, usar valor numérico 10
+            sf = LORA_SF10;
+            cr = LORA_CR_4_5;
+            Serial.println("Configurando SX1262 para 1km: SF10, CR 4/5");
+            break;
+        case DISTANCE_1_5KM:
+        default:
+            // 1.5km: Configuración actual (SF12, CR 4/8) - estas constantes sabemos que existen
+            sf = LORA_SF12;
+            cr = LORA_CR_4_8;
+            Serial.println("Configurando SX1262 para 1.5km: SF12, CR 4/8");
+            break;
+    }
+    
+    // Aplicar configuración con verificaciones de seguridad
+    // IMPORTANTE: Detener cualquier operación en curso antes de reconfigurar
+    LT.setMode(MODE_STDBY_RC);
+    delay(50); // Delay más largo para asegurar que el modo se estableció completamente
+    
+    // Limpiar cualquier IRQ pendiente antes de reconfigurar
+    LT.clearIrqStatus(IRQ_RADIO_ALL);
+    
+    // Aplicar parámetros de modulación
+    LT.setModulationParams(sf, Bandwidth, cr, Optimisation);
     LT.setPacketParams(8, LORA_PACKET_VARIABLE_LENGTH, 255, LORA_CRC_ON, LORA_IQ_NORMAL);
     LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
     LT.setHighSensitivity();
     LT.setSyncWord(LORA_MAC_PRIVATE_SYNCWORD);
     
-    Serial.println("SX1262 LoRa module configured");
+    // IMPORTANTE: Reiniciar el estado de recepción
+    // Esto asegura que el flag WAITING_LORA se resetee para que checkIncomeMessage() 
+    // pueda iniciar una nueva recepción
+    lora.WAITING_LORA = false;
+    
+    // Configurar para recepción - usar setRx directamente en lugar de MODE_RX
+    // Esto asegura que el timeout se configure correctamente
+    LT.setMode(MODE_STDBY_RC);
+    delay(10);
+    LT.setDioIrqParams(IRQ_RADIO_ALL, (IRQ_RX_DONE + IRQ_RX_TX_TIMEOUT), 0, 0);
+    LT.setRx(LORA_TIMEOUT);
+    
+    Serial.print("SX1262 configurado exitosamente: SF=");
+    Serial.print(sf);
+    Serial.print(", CR=");
+    Serial.println(cr);
 }
 
 bool processLoRaMessage(SensorData &data) { // El parámetro 'data' se mantiene por compatibilidad

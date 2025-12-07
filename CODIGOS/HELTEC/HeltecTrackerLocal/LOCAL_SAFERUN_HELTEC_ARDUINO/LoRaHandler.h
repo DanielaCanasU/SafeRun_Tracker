@@ -11,6 +11,7 @@ extern SX126XLT LT;
 bool initLoRaHandler();
 bool processLoRaMessage(SensorData &data);
 void configureSX1262();
+void configureSX1262ForDistance(ExerciseDistance distance);
 uint8_t getLastPacketInfo(int8_t* rssi, int8_t* snr);
 void getPacketStats(uint32_t* packetCount, uint32_t* errorCount);
 void printPacketStats();
@@ -21,12 +22,13 @@ void sendACK(const String& remoteDeviceId);
 class LoRa {
     private:
         int mensaje;
-        bool WAITING_LORA = false;
         unsigned long lastLoraCheck = 0;
     public:
         LoRa();
         void init();
         void checkIncomeMessage();
+        void resetReceptionState(); // Método para resetear el estado de recepción
+        bool WAITING_LORA = false; // Hacer público para poder resetearlo desde configureSX1262ForDistance
         int lastACKreceived = 0;
         String lastFromID = "";
 };

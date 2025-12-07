@@ -17,7 +17,7 @@ const char* USER_EMAIL = "justtoprivacy@gmail.com";
 const char* USER_PASSWORD = "28082002";
 
 // Timing configuration
-const unsigned long PUBLISH_INTERVAL = 20000;  // 20 seconds
+unsigned long PUBLISH_INTERVAL = 20000;  // 20 seconds
 const unsigned long CHECK_INTERVAL = 10000;    // 10 seconds
 const unsigned long LORA_CHECK_INTERVAL = 100; // 100ms
 

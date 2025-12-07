@@ -16,6 +16,7 @@
 #include "DFPlayerMod.h"
 #include "Accel.h"
 #include "Battery.h"
+#include "Backtrack.h"
 
 void setup() {
   Serial.begin(115200);
@@ -111,6 +112,22 @@ void loop() {
     handleExerciseScreen();
   } else if (currentScreen == SCREEN_DISCONNECTED) {
     // La pantalla de desconexión no necesita actualizaciones constantes
+  } else if (currentScreen == SCREEN_DISTANCE_CONFIG) {
+    // No necesita actualizaciones constantes
+  } else if (currentScreen == SCREEN_BACKTRACK) {
+    // Actualizar navegación si GPS está disponible y hay waypoint válido
+    if (localPositionSet && hasWaypointTarget && selectedWaypointIndex >= 0 && selectedWaypointIndex < waypointCount) {
+      updateWaypointNavigation();
+      drawBacktrackScreen(false);
+    }
+    // Si no hay waypoint válido, la pantalla ya muestra el mensaje apropiado
+  } else if (currentScreen == SCREEN_WAYPOINT_MANAGER) {
+    // No necesita actualizaciones constantes
+  } else if (currentScreen == SCREEN_BACKTRACK_MAP) {
+    // Actualizar mapa si GPS cambió
+    if (localPositionSet) {
+      drawBacktrackMapScreen(false);
+    }
   }
 
   detectorCaida.checkStatus();

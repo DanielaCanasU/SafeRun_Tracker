@@ -10,6 +10,7 @@
 #include <SX126XLT.h>
 #include "LoRaComm.h"
 #include "GPS.h"
+#include "Backtrack.h"
 
 
 // Objetos
@@ -76,9 +77,24 @@ bool folderSelected = false;
 
 // Menú principal
 int mainMenuSelection = 0;
-const int MAIN_MENU_OPTIONS = 6; // base (GPS, Musica, Monitoreo, Info) — mantendremos 4 visibles; amplíaremos en Display
+const int MAIN_MENU_OPTIONS = 8; // GPS, Musica, Monitoreo, Info, Ejercicio, Emergencia, Backtrack, Config Distancia
 int lastMainMenuIdx = -1;
 MenuScreen lastRenderedScreen = SCREEN_COUNT; // Inicializar con valor inválido
+
+// Backtracking
+Waypoint waypoints[MAX_WAYPOINTS];
+int waypointCount = 0;
+int selectedWaypointIndex = -1;
+int waypointScrollOffset = 0;
+NavigationData waypointNavigation;
+bool hasWaypointTarget = false;
+float localLatitude = 0.0f;
+float localLongitude = 0.0f;
+bool localPositionSet = false;
+unsigned long lastLocalGPSUpdate = 0;
+
+// Configuración de distancia para ejercicio
+ExerciseDistance selectedExerciseDistance = DISTANCE_1_5KM; // Por defecto 1.5km (configuración actual)
 
 ButtonState leftButton = {0,0,false,false,0,0,0};
 ButtonState rightButton = {0,0,false,false,0,0,0};

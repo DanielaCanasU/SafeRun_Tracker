@@ -1,6 +1,7 @@
 #include "GPS.h"
 #include "Display.h"
 #include <HT_TinyGPS++.h>
+#include "Backtrack.h"
 
 Geolocation::Geolocation(){}
 
@@ -113,6 +114,11 @@ void getGpsData() {
           if (dist > 0.1 && dist < 1000.0) exerciseDistanceMeters += (float)dist;
         }
         lastExerciseLat = (float)latf; lastExerciseLon = (float)lonf; lastExercisePosSet = true;
+      }
+      
+      // Actualizar posición GPS local para backtracking
+      if (gps.location.isValid() && gps.location.lat() != 0.0 && gps.location.lng() != 0.0) {
+        updateLocalGPSPosition((float)gps.location.lat(), (float)gps.location.lng());
       }
       
       // Limpiar buffer

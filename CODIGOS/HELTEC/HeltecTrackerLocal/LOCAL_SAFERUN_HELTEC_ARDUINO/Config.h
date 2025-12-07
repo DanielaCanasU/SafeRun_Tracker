@@ -14,7 +14,7 @@ extern const char* USER_EMAIL;
 extern const char* USER_PASSWORD;
 
 // Timing configuration
-extern const unsigned long PUBLISH_INTERVAL;
+extern unsigned long PUBLISH_INTERVAL;
 extern const unsigned long CHECK_INTERVAL;
 extern const unsigned long LORA_CHECK_INTERVAL;
 

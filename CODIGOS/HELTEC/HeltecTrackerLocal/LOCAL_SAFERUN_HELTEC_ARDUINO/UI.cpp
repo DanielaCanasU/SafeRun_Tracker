@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <Preferences.h>
 #include "SensorData.h"
+#include "LoRaHandler.h"
 // Función robusta de mapeo flotante
 int mapf(float value, float in_min, float in_max, int out_min, int out_max);
 
@@ -23,7 +24,7 @@ static void renderInfoScreen();
 #define ST7735_GRAY ST7735_COLOR565(128, 128, 128)
 
 // Menu state (mirrors ESP32 OLEDMenu)
-enum class MenuScreen { Welcome, SelectMode, MenuPrincipal, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing, BacktrackMap };
+enum class MenuScreen { Welcome, SelectMode, MenuPrincipal, WiFiSubMenu, WiFiScan, WiFiSelectSSID, WiFiEnterPassword, WiFiConnecting, WiFiStatus, Info, LocalData, Tracking, Backtrack, WaypointManager, Pairing, BacktrackMap, DistanceConfig };
 static MenuScreen currentScreen = MenuScreen::Welcome;
 static bool wifiConnected = false;
 
@@ -77,7 +78,7 @@ static float lastSnr = -999.0f;
 static bool lastSensor4 = false;
 
 // Add main menu state variables
-static int mainMenuIdx = 0; // 0 = Modo, 1 = WiFi, 2 = Datos Locales, 3 = Info, 4 = Rastreo, 5 = Backtrack, 6 = Emparejar
+static int mainMenuIdx = 0; // 0 = Modo, 1 = WiFi, 2 = Datos Locales, 3 = Info, 4 = Rastreo, 5 = Backtrack, 6 = Emparejar, 7 = Config Dist
 static int lastMainMenuIdx = -1;
 
 // Pairing system variables
@@ -501,12 +502,7 @@ static void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bg
        drawLine(x - 4, y + 16, x - 1, y + 16, fg);
        drawLine(x - 1, y + 13, x - 1, y + 16, fg);
      } break;
-     case 6: { // Info: círculo con i
-      drawCircle(x + 9, y + 9, 7, fg);
-      drawLine(x + 9, y + 6, x + 9, y + 11, fg);
-      st7735.st7735_draw_pixel(x + 9, y + 5, fg);
-    } break;
-     case 7: { // Emparejar: icono de dos dispositivos conectados
+     case 6: { // Emparejar: icono de dos dispositivos conectados
        // Dispositivo izquierdo
        drawCircle(x + 4, y + 9, 3, fg);
        // Dispositivo derecho
@@ -516,6 +512,19 @@ static void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bg
        // Puntos de conexión en cada dispositivo
        drawLine(x + 6, y + 9, x + 8, y + 9, fg);
        drawLine(x + 10, y + 9, x + 12, y + 9, fg);
+    } break;
+     case 7: { // Config Dist: icono de engranaje/configuración
+       // Engranaje simple
+       int centerX = x + 9;
+       int centerY = y + 9;
+       int radius = 6;
+       // Círculo exterior
+       drawCircleOutline(centerX, centerY, radius, fg);
+       // Dientes del engranaje (4 dientes)
+       drawLine(centerX, y + 2, centerX, y + 16, fg); // Arriba-abajo
+       drawLine(x + 2, centerY, x + 16, centerY, fg); // Izquierda-derecha
+       // Círculo interior
+       drawCircle(centerX, centerY, 2, fg);
     } break;
   }
 }
@@ -546,7 +555,7 @@ static void renderMainMenu() {
     fillRectPixels(20, 34, 120, 26, ST7735_WHITE); // Limpia el centro de la barra blanca
 
     // --- Redibujado de items ---
-    const char* menuItems[] = {"Modo", "WiFi", "Remoto", "Local", "Rastreo", "Backtrack", "Emparejar"};
+    const char* menuItems[] = {"Modo", "WiFi", "Remoto", "Local", "Rastreo", "Backtrack", "Emparejar", "Config Dist"};
 
     // Dibujar opción de arriba (si existe)
     if (mainMenuIdx > 0) {
@@ -579,6 +588,14 @@ static void renderMainMenu() {
         case 5:
           textX = 55;
           iconX = 45;
+          break;
+        case 6:
+          textX = 40;
+          iconX = 20;
+          break;
+        case 7:
+          textX = 25;
+          iconX = 5;
           break;
       }
 
@@ -621,6 +638,10 @@ static void renderMainMenu() {
         selectedTextX = 40;
         selectedIconX = 25;
         break;
+      case 7:
+        selectedTextX = 20;
+        selectedIconX = 0;
+        break;
     }
      
 
@@ -630,7 +651,7 @@ static void renderMainMenu() {
     write_str_bold(selectedTextX, 38, selectedText.c_str(), Font_11x18, ST7735_BLACK, ST7735_WHITE);
 
     // Dibujar opción de abajo (si existe)
-      if (mainMenuIdx < 6) { // Cambiado de 5 a 6 para mostrar la opción de abajo
+      if (mainMenuIdx < 7) { // Cambiado a 7 para mostrar la opción de abajo
       int belowIdx = mainMenuIdx + 1;
       String belowText =  String(menuItems[belowIdx]);
       // Calculate centered positions
@@ -664,6 +685,10 @@ static void renderMainMenu() {
         case 6:
           belowTextX = 55;
           belowIconX = 35;
+          break;
+        case 7:
+          belowTextX = 25;
+          belowIconX = 5;
           break;
       }
        
@@ -1090,6 +1115,49 @@ static void renderBacktrack() {
   // drawFooter("OK: waypoints | BACK: menu");
 }
 
+// Pantalla de configuración de distancia
+static void renderDistanceConfig() {
+  static MenuScreen lastScreen = MenuScreen::Info;
+  
+  if (lastRenderedScreen != MenuScreen::DistanceConfig) {
+    drawHeaderWithWiFi("Config Distancia");
+    lastRenderedScreen = MenuScreen::DistanceConfig;
+    lastScreen = MenuScreen::DistanceConfig;
+  }
+  
+  // Título
+  st7735.st7735_write_str(20, 20, "Distancia ejercicio:", Font_7x10, ST7735_WHITE);
+  
+  // Opciones con indicador de selección
+  const char* options[] = {"500 metros", "1 kilometro", "1.5 kilometros"};
+  int yPos = 35;
+  
+  for (int i = 0; i < DISTANCE_COUNT; i++) {
+    uint16_t bgColor = (i == selectedExerciseDistance) ? MORADO : ST7735_BLACK;
+    uint16_t textColor = (i == selectedExerciseDistance) ? ST7735_WHITE : ST7735_GRAY;
+    
+    // Dibujar fondo si está seleccionado
+    if (i == selectedExerciseDistance) {
+      fillRectPixels(10, yPos - 2, 140, 12, MORADO);
+    }
+    
+    // Indicador de selección
+    if (i == selectedExerciseDistance) {
+      st7735.st7735_write_str(12, yPos, ">", Font_7x10, ST7735_WHITE, MORADO);
+    } else {
+      st7735.st7735_write_str(12, yPos, " ", Font_7x10, ST7735_BLACK);
+    }
+    
+    // Texto de la opción
+    st7735.st7735_write_str(20, yPos, options[i], Font_7x10, textColor, bgColor);
+    
+    yPos += 15;
+  }
+  
+  // Información de configuración LoRa
+  st7735.st7735_write_str(5, 75, "OK: Confirmar", Font_7x10, NARANJA);
+}
+
 // 1. Agregar nuevo estado de pantalla para el minimapa:
 static void renderBacktrackMap() {
     if (lastRenderedScreen != MenuScreen::BacktrackMap) {
@@ -1351,8 +1419,8 @@ void Display::updateUI(unsigned long now) {
   switch (currentScreen) {
     case MenuScreen::MenuPrincipal: {
              // Main menu navigation
-                 if (readBtnUp())   mainMenuIdx = (mainMenuIdx - 1 + 7) % 7;
-         if (readBtnDown()) mainMenuIdx = (mainMenuIdx + 1) % 7;
+                 if (readBtnUp())   mainMenuIdx = (mainMenuIdx - 1 + 8) % 8;
+         if (readBtnDown()) mainMenuIdx = (mainMenuIdx + 1) % 8;
       
       // Check for short press to enter submenu
       static bool okWasPressed = false;
@@ -1382,6 +1450,7 @@ void Display::updateUI(unsigned long now) {
                case 4: currentScreen = MenuScreen::Tracking; break;
                 case 5: currentScreen = MenuScreen::WaypointManager; break; // Gestionar waypoints
                 case 6: currentScreen = MenuScreen::Pairing; break; // Pantalla de emparejamiento
+                case 7: currentScreen = MenuScreen::DistanceConfig; break; // Configuración de distancia
              }
           }
         }
@@ -1821,6 +1890,40 @@ void Display::updateUI(unsigned long now) {
             lastRenderedScreen = MenuScreen::BacktrackMap; // Forzar redibujado
         }
         break;
+      
+      // Configuración de distancia: navegación y selección
+      case MenuScreen::DistanceConfig: {
+        // Navegación LEFT/RIGHT (Up/Down en este dispositivo)
+        if (readBtnUp()) {
+          selectedExerciseDistance = (ExerciseDistance)((selectedExerciseDistance - 1 + DISTANCE_COUNT) % DISTANCE_COUNT);
+          lastRenderedScreen = MenuScreen::Info; // Force redraw
+        } else if (readBtnDown()) {
+          selectedExerciseDistance = (ExerciseDistance)((selectedExerciseDistance + 1) % DISTANCE_COUNT);
+          lastRenderedScreen = MenuScreen::Info; // Force redraw
+        }
+        
+        // OK: Confirmar y volver al menú principal
+        if (readBtnOk()) {
+          // Configurar SX1262 con la distancia seleccionada
+          configureSX1262ForDistance(selectedExerciseDistance);
+          // Ajustar el intervalo de publicación según distancia
+          switch(selectedExerciseDistance) {
+            case DISTANCE_500M: PUBLISH_INTERVAL = 5000; break;
+            case DISTANCE_1KM: PUBLISH_INTERVAL = 10000; break;
+            case DISTANCE_1_5KM:
+            default: PUBLISH_INTERVAL = 20000; break;
+          }
+          currentScreen = MenuScreen::MenuPrincipal;
+          lastRenderedScreen = MenuScreen::Info; // Force redraw
+        }
+        
+        // BACK: Volver al menú principal sin cambios
+        if (readBtnBack()) {
+          currentScreen = MenuScreen::MenuPrincipal;
+          lastRenderedScreen = MenuScreen::Info; // Force redraw
+        }
+        break;
+      }
   }
 
 render:
@@ -1889,6 +1992,7 @@ render:
       case MenuScreen::Backtrack: renderBacktrack(); break;
       case MenuScreen::Pairing: renderPairing(); break;
       case MenuScreen::BacktrackMap: renderBacktrackMap(); break;
+      case MenuScreen::DistanceConfig: renderDistanceConfig(); break;
   }
 }
 

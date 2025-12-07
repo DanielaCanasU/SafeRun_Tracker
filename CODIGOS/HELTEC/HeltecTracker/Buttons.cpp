@@ -6,6 +6,8 @@
 #include "AppState.h"
 #include "Pins.h"
 #include "Accel.h"
+#include "Backtrack.h"
+#include "LoRaComm.h"
 
 Botones::Botones() {
   // Constructor implementation
@@ -48,6 +50,28 @@ void Botones::checkUserEntry(){
     return;
   }
   this->checkEmergencyCombo();
+  
+  // Combo LEFT + RIGHT para agregar waypoint (solo en Waypoint Manager)
+  static bool comboAddWaypoint = false;
+  static unsigned long comboAddStart = 0;
+  if (currentScreen == SCREEN_WAYPOINT_MANAGER && left && right && !sel) {
+    if (!comboAddWaypoint) {
+      comboAddWaypoint = true;
+      comboAddStart = currentTime;
+    } else if (currentTime - comboAddStart >= 1000) { // 1 segundo para activar
+      if (waypointCount < MAX_WAYPOINTS && localPositionSet) {
+        String waypointName = "Punto " + String(waypointCount + 1);
+        saveCurrentPositionAsWaypoint(waypointName);
+        if (waypointCount > 3) {
+          waypointScrollOffset = max(0, waypointCount - 3);
+        }
+        drawWaypointManagerScreen(false);
+      }
+      comboAddWaypoint = false;
+    }
+  } else {
+    comboAddWaypoint = false;
+  }
 
   if (!needProcessButton && !left && !right) return; //Si no hay entrada del usuario nos retiramos por donde vinimos
 
@@ -157,6 +181,26 @@ void Botones::handleUserGestures(uint8_t button, bool isLongPress, bool isDouble
           currentScreen = SCREEN_EMERGENCY;
           drawEmergencyScreen(true);
           break;
+        case 6: // Backtrack
+          currentScreen = SCREEN_WAYPOINT_MANAGER;
+          // Inicializar selectedWaypointIndex si hay waypoints
+          loadWaypointsFromStorage();
+          if (waypointCount > 0) {
+            // Si no hay selección válida, seleccionar el primero
+            if (selectedWaypointIndex < 0 || selectedWaypointIndex >= waypointCount) {
+              selectedWaypointIndex = 0;
+            }
+          } else {
+            selectedWaypointIndex = -1;
+            hasWaypointTarget = false;
+          }
+          waypointScrollOffset = 0; // Resetear scroll
+          drawWaypointManagerScreen(true);
+          break;
+        case 7: // Config Distancia
+          currentScreen = SCREEN_DISTANCE_CONFIG;
+          drawDistanceConfigScreen(true);
+          break;
       }
     }
     return;
@@ -222,14 +266,81 @@ void Botones::handleUserGestures(uint8_t button, bool isLongPress, bool isDouble
       }
       if (currentScreen == SCREEN_EXERCISE) {
         // Select: iniciar/detener
-        if (!isMonitoringActive) { isMonitoringActive = true; exerciseStartMs = millis(); lastExercisePosSet = false; }
-        else { isMonitoringActive = false; exercisePausedAccumMs = exercisePausedAccumMs + (millis() - exerciseStartMs); }
+        if (!isMonitoringActive) { 
+          isMonitoringActive = true; 
+          exerciseStartMs = millis(); 
+          lastExercisePosSet = false;
+          // Configurar SX1262 según la distancia seleccionada cuando se inicia el ejercicio
+          // Verificar que selectedExerciseDistance esté en rango válido
+          if (selectedExerciseDistance < DISTANCE_COUNT) {
+            configureSX1262ForDistance(selectedExerciseDistance);
+          } else {
+            // Si está fuera de rango, usar valor por defecto
+            Serial.println("ERROR: selectedExerciseDistance fuera de rango, usando 1.5km");
+            configureSX1262ForDistance(DISTANCE_1_5KM);
+          }
+        }
+        else { 
+          isMonitoringActive = false; 
+          exercisePausedAccumMs = exercisePausedAccumMs + (millis() - exerciseStartMs); 
+        }
         drawExerciseScreen(false);
+      }
+      // Configuración de distancia: navegación y selección
+      if (currentScreen == SCREEN_DISTANCE_CONFIG && button == BUTTON_SELECT && !isLongPress) {
+        // Confirmar selección y volver al menú principal
+        currentScreen = SCREEN_MAIN_MENU;
+        Serial.println("Volviendo al menú principal");
+
+        // Actualizar el intervalo de envío según la distancia
+        switch(selectedExerciseDistance) {
+          case DISTANCE_500M: sendInterval_LoRa_receive_ack = 2000; break;
+          case DISTANCE_1KM:  sendInterval_LoRa_receive_ack = 5000; break;
+          case DISTANCE_1_5KM: default: sendInterval_LoRa_receive_ack = 10000; break;
+        }
+
+        display.drawMenu(SCREEN_MAIN_MENU, true);
+        Serial.println("Volviendo al menú principal");
+        //return;
       }
       if (currentScreen == SCREEN_EMERGENCY && detectorCaida.emergencia && emergencyConfirmDeactivate) {
         // Confirmar apagado de emergencia
         detectorCaida.emergencia = false; emergencyConfirmDeactivate = false;
         drawEmergencyScreen(true);
+      }
+      // Backtrack: Waypoint Manager - SELECT para entrar a navegación
+      if (currentScreen == SCREEN_WAYPOINT_MANAGER && button == BUTTON_SELECT && !isLongPress) {
+        // Solo entrar a navegación si hay waypoints y uno está seleccionado
+        if (waypointCount > 0 && selectedWaypointIndex >= 0 && selectedWaypointIndex < waypointCount) {
+          // Seleccionar el waypoint y establecer el target ANTES de cambiar la pantalla
+          selectWaypoint(selectedWaypointIndex);
+          
+          // Verificar que se estableció correctamente antes de cambiar
+          if (hasWaypointTarget && selectedWaypointIndex >= 0 && selectedWaypointIndex < waypointCount) {
+            // Cambiar a pantalla de navegación
+            currentScreen = SCREEN_BACKTRACK;
+            // Dibujar la pantalla
+            drawBacktrackScreen(true);
+            // IMPORTANTE: Salir inmediatamente para evitar que se ejecute la siguiente condición
+            return;
+          }
+        }
+        // Si no hay waypoints o ninguno seleccionado, quedarse en Waypoint Manager
+        return; // También salir si no se puede entrar a navegación
+      }
+      // Backtrack: Navegación - SELECT para volver a gestión
+      // IMPORTANTE: Usar else if para que NO se ejecute si ya se cambió a SCREEN_BACKTRACK arriba
+      // Y verificar que NO sea long press (long press es para volver al menú principal)
+      else if (currentScreen == SCREEN_BACKTRACK && button == BUTTON_SELECT && !isLongPress) {
+        currentScreen = SCREEN_WAYPOINT_MANAGER;
+        drawWaypointManagerScreen(true);
+        return; // Salir después de cambiar
+      }
+      // Backtrack: Mapa - SELECT para volver a gestión
+      else if (currentScreen == SCREEN_BACKTRACK_MAP && button == BUTTON_SELECT) {
+        currentScreen = SCREEN_WAYPOINT_MANAGER;
+        drawWaypointManagerScreen(true);
+        return; // Salir después de cambiar
       }
     }
   } else {
@@ -257,8 +368,70 @@ void Botones::handleUserGestures(uint8_t button, bool isLongPress, bool isDouble
         // No hacemos nada aquí aparte de redibujar
         drawExerciseScreen(false);
       }
+      // Configuración de distancia: navegación LEFT/RIGHT
+      if (currentScreen == SCREEN_DISTANCE_CONFIG && !isLongPress) {
+        if (button == BUTTON_LEFT) {
+          selectedExerciseDistance = (ExerciseDistance)((selectedExerciseDistance - 1 + DISTANCE_COUNT) % DISTANCE_COUNT);
+          drawDistanceConfigScreen(false);
+        } else if (button == BUTTON_RIGHT) {
+          selectedExerciseDistance = (ExerciseDistance)((selectedExerciseDistance + 1) % DISTANCE_COUNT);
+          drawDistanceConfigScreen(false);
+        }
+      }
+      // Backtrack: Waypoint Manager - navegación
+      if (currentScreen == SCREEN_WAYPOINT_MANAGER) {
+        if (button == BUTTON_LEFT && !isLongPress) {
+          if (waypointCount > 0) {
+            selectedWaypointIndex = (selectedWaypointIndex - 1 + waypointCount) % waypointCount;
+            int maxScrollOffset = max(0, waypointCount - 3);
+            if (selectedWaypointIndex < waypointScrollOffset) {
+              waypointScrollOffset = max(0, selectedWaypointIndex);
+            }
+            drawWaypointManagerScreen(false);
+          }
+        } else if (button == BUTTON_RIGHT && !isLongPress) {
+          if (waypointCount > 0) {
+            int prevSelected = selectedWaypointIndex;
+            selectedWaypointIndex = (selectedWaypointIndex + 1) % waypointCount;
+            int maxScrollOffset = max(0, waypointCount - 3);
+            if (selectedWaypointIndex >= waypointScrollOffset + 3) {
+              waypointScrollOffset = min(maxScrollOffset, selectedWaypointIndex - 2);
+            }
+            if (prevSelected == waypointCount - 1 && selectedWaypointIndex == 0) {
+              waypointScrollOffset = 0;
+            }
+            drawWaypointManagerScreen(false);
+          }
+        } else if (button == BUTTON_LEFT && isLongPress) {
+          // LEFT long press: eliminar waypoint seleccionado
+          // PROTECCIÓN: Verificar índices antes de borrar
+          if (waypointCount > 0 && selectedWaypointIndex >= 0 && selectedWaypointIndex < waypointCount) {
+            deleteWaypoint(selectedWaypointIndex);
+            // PROTECCIÓN: Verificar que selectedWaypointIndex sea válido después de borrar
+            if (selectedWaypointIndex >= waypointCount) {
+              selectedWaypointIndex = -1;
+            }
+            int maxScrollOffset = max(0, waypointCount - 3);
+            if (waypointScrollOffset > maxScrollOffset) {
+              waypointScrollOffset = maxScrollOffset;
+            }
+            drawWaypointManagerScreen(false);
+          }
+        }
+      }
+      // Backtrack: Navegación - cambiar a mapa
+      if (currentScreen == SCREEN_BACKTRACK && (button == BUTTON_LEFT || button == BUTTON_RIGHT)) {
+        currentScreen = SCREEN_BACKTRACK_MAP;
+        drawBacktrackMapScreen(true);
+        return;
+      } else if (currentScreen == SCREEN_BACKTRACK_MAP && (button == BUTTON_LEFT || button == BUTTON_RIGHT)) {
+        currentScreen = SCREEN_BACKTRACK;
+        drawBacktrackScreen(true);
+        return;
+      }
     }
   }
+  
 }
 
 

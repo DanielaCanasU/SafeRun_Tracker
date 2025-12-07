@@ -5,6 +5,7 @@
 #include <SoftwareSerial.h>
 #include <HardwareSerial.h>  //Puerto Serial
 #include "AppState.h"
+#include "Backtrack.h"
 
 Display::Display() {
 }
@@ -75,7 +76,7 @@ void Display::drawMenu(MenuScreen currentMenu, bool firstDraw) {
       fillRectPixels(20, 34, 120, 26, ST7735_WHITE);  // Limpia el centro de la barra blanca
 
       // --- Redibujado de items ---
-      const char* menuItems[] = { "GPS", "Musica", "Monitoreo", "Info", "Ejercicio", "Emergencia" };
+      const char* menuItems[] = { "GPS", "Musica", "Monitoreo", "Info", "Ejercicio", "Emergencia", "Backtrack" };
 
       // Dibujar opción de arriba (si existe)
       if (mainMenuSelection > 0) {
@@ -104,6 +105,10 @@ void Display::drawMenu(MenuScreen currentMenu, bool firstDraw) {
           case 4:  // Ejercicio
             textX = 53;
             iconX = 33;
+            break;
+          case 5:  // Emergencia
+            textX = 50;
+            iconX = 30;
             break;
         }
 
@@ -142,6 +147,14 @@ void Display::drawMenu(MenuScreen currentMenu, bool firstDraw) {
           selectedTextX = 23;
           selectedIconX = 43;
           break;
+          case 6:  // Backtrack
+            selectedTextX = 35;
+            selectedIconX = 15;
+            break;
+          case 7:  // Config Dist
+            selectedTextX = 20;
+            selectedIconX = 0;
+            break;
       }
 
       // Icon for selected (on white bg) - centered
@@ -149,7 +162,7 @@ void Display::drawMenu(MenuScreen currentMenu, bool firstDraw) {
       write_str_bold(selectedTextX, 38, selectedText.c_str(), Font_11x18, ST7735_BLACK, ST7735_WHITE);
 
       // Dibujar opción de abajo (si existe)
-      if (mainMenuSelection < 5) {
+      if (mainMenuSelection < 7) {
         int belowIdx = mainMenuSelection + 1;
         String belowText = String(menuItems[belowIdx]);
         // Calculate centered positions
@@ -175,6 +188,14 @@ void Display::drawMenu(MenuScreen currentMenu, bool firstDraw) {
           case 5:  // Emergencia
             belowTextX = 50;
             belowIconX = 30;
+            break;
+          case 6:  // Backtrack
+            belowTextX = 40;
+            belowIconX = 20;
+            break;
+          case 7:  // Config Dist
+            belowTextX = 25;
+            belowIconX = 5;
             break;
         }
 
@@ -237,8 +258,8 @@ void drawMainMenu() {
     //    Esto es necesario para borrar el texto e icono antiguos antes de dibujar los nuevos.
     fillRectPixels(20, 34, 120, 26, ST7735_WHITE);  // Limpia el centro de la barra blanca
 
-    // --- Redibujado de items ---
-    const char* menuItems[] = { "GPS", "Musica", "Monitoreo", "Info", "Ejercicio", "Emergencia" };
+      // --- Redibujado de items ---
+      const char* menuItems[] = { "GPS", "Musica", "Monitoreo", "Info", "Ejercicio", "Emergencia", "Backtrack", "Config Dist" };
 
     // Dibujar opción de arriba (si existe)
     if (mainMenuSelection > 0) {
@@ -267,6 +288,18 @@ void drawMainMenu() {
         case 4:  // Ejercicio
           textX = 53;
           iconX = 33;
+          break;
+        case 5:  // Emergencia
+          textX = 50;
+          iconX = 30;
+          break;
+        case 6:  // Backtrack
+          textX = 40;
+          iconX = 20;
+          break;
+        case 7:  // Config Dist
+          textX = 25;
+          iconX = 5;
           break;
       }
 
@@ -305,6 +338,14 @@ void drawMainMenu() {
         selectedTextX = 23;
         selectedIconX = 43;
         break;
+      case 6:  // Backtrack
+        selectedTextX = 35;
+        selectedIconX = 15;
+        break;
+      case 7:  // Config Dist
+        selectedTextX = 20;
+        selectedIconX = 0;
+        break;
     }
 
     // Icon for selected (on white bg) - centered
@@ -312,7 +353,7 @@ void drawMainMenu() {
     write_str_bold(selectedTextX, 38, selectedText.c_str(), Font_11x18, ST7735_BLACK, ST7735_WHITE);
 
     // Dibujar opción de abajo (si existe)
-    if (mainMenuSelection < 5) {
+    if (mainMenuSelection < 7) {
       int belowIdx = mainMenuSelection + 1;
       String belowText = String(menuItems[belowIdx]);
       // Calculate centered positions
@@ -338,6 +379,14 @@ void drawMainMenu() {
         case 5:  // Emergencia
           belowTextX = 50;
           belowIconX = 30;
+          break;
+        case 6:  // Backtrack
+          belowTextX = 40;
+          belowIconX = 20;
+          break;
+        case 7:  // Config Dist
+          belowTextX = 25;
+          belowIconX = 5;
           break;
       }
 
@@ -688,6 +737,48 @@ void drawDisconnectedScreen(bool firstDraw) {
   }
 }
 
+void drawDistanceConfigScreen(bool firstDraw) {
+  static MenuScreen lastScreen = SCREEN_COUNT;
+  
+  if (firstDraw || lastScreen != SCREEN_DISTANCE_CONFIG) {
+    st7735.st7735_fill_screen(ST7735_BLACK);
+    drawHeaderWithWiFi("Config Distancia");
+    lastScreen = SCREEN_DISTANCE_CONFIG;
+  }
+  
+  // Título
+  st7735.st7735_write_str(20, 20, "Distancia ejercicio:", Font_7x10, ST7735_WHITE);
+  
+  // Opciones con indicador de selección
+  const char* options[] = {"500 metros", "1 kilometro", "1.5 kilometros"};
+  int yPos = 35;
+  
+  for (int i = 0; i < DISTANCE_COUNT; i++) {
+    uint16_t bgColor = (i == selectedExerciseDistance) ? MORADO : ST7735_BLACK;
+    uint16_t textColor = (i == selectedExerciseDistance) ? ST7735_WHITE : ST7735_GRAY;
+    
+    // Dibujar fondo si está seleccionado
+    if (i == selectedExerciseDistance) {
+      fillRectPixels(10, yPos - 2, 140, 12, MORADO);
+    }
+    
+    // Indicador de selección
+    if (i == selectedExerciseDistance) {
+      st7735.st7735_write_str(12, yPos, ">", Font_7x10, ST7735_WHITE, MORADO);
+    } else {
+      st7735.st7735_write_str(12, yPos, " ", Font_7x10, ST7735_BLACK);
+    }
+    
+    // Texto de la opción
+    st7735.st7735_write_str(20, yPos, options[i], Font_7x10, textColor, bgColor);
+    
+    yPos += 15;
+  }
+  
+  // Información de configuración LoRa
+  st7735.st7735_write_str(5, 75, "Select: Confirmar", Font_7x10, NARANJA);
+}
+
 void notifyFallDetected() {
   fallPopupActive = true;
   fallPopupEndMs = millis() + 10000;
@@ -925,6 +1016,396 @@ void write_str_bold(uint16_t x, uint16_t y, const char* text, FontDef font, uint
   st7735.st7735_write_str(x + 1, y, text, font, color, bgcolor);
 }
 
+// Función para dibujar una brújula simple
+void drawCompass(int centerX, int centerY, int radius, float bearing, uint16_t color) {
+  static float lastBearing = -1.0f;
+  static int lastArrowX = -1, lastArrowY = -1;
+  static int lastTip1X = -1, lastTip1Y = -1, lastTip2X = -1, lastTip2Y = -1;
+  
+  // Limpiar la flecha anterior si cambió la dirección
+  if (lastBearing >= 0.0f && lastBearing != bearing) {
+    int arrowClearX = min(lastArrowX, min(lastTip1X, lastTip2X)) - 2;
+    int arrowClearY = min(lastArrowY, min(lastTip1Y, lastTip2Y)) - 2;
+    int arrowClearW = max(lastArrowX, max(lastTip1X, lastTip2X)) - arrowClearX + 4;
+    int arrowClearH = max(lastArrowY, max(lastTip1Y, lastTip2Y)) - arrowClearY + 4;
+    
+    for (int y = arrowClearY; y < arrowClearY + arrowClearH; y++) {
+      for (int x = arrowClearX; x < arrowClearX + arrowClearW; x++) {
+        if (x >= 0 && x < 160 && y >= 0 && y < 128) {
+          st7735.st7735_draw_pixel(x, y, ST7735_BLACK);
+        }
+      }
+    }
+  }
+  
+  // Dibujar círculo exterior
+  for (int angle = 0; angle < 360; angle += 5) {
+    float rad = angle * 3.14159265359 / 180.0;
+    int x1 = centerX + (radius - 2) * cos(rad);
+    int y1 = centerY + (radius - 2) * sin(rad);
+    int x2 = centerX + radius * cos(rad);
+    int y2 = centerY + radius * sin(rad);
+    drawLine(x1, y1, x2, y2, color);
+  }
+  
+  // Dibujar flecha de dirección
+  float adjustedBearing = bearing - 90.0;
+  if (adjustedBearing < 0) adjustedBearing += 360.0;
+  
+  float arrowRad = adjustedBearing * 3.14159265359 / 180.0;
+  int arrowX = centerX + (radius - 5) * cos(arrowRad);
+  int arrowY = centerY + (radius - 5) * sin(arrowRad);
+  
+  drawLine(centerX, centerY, arrowX, arrowY, color);
+  
+  float tip1Rad = arrowRad - 0.3;
+  float tip2Rad = arrowRad + 0.3;
+  int tip1X = arrowX - 8 * cos(tip1Rad);
+  int tip1Y = arrowY - 8 * sin(tip1Rad);
+  int tip2X = arrowX - 8 * cos(tip2Rad);
+  int tip2Y = arrowY - 8 * sin(tip2Rad);
+  
+  drawLine(arrowX, arrowY, tip1X, tip1Y, color);
+  drawLine(arrowX, arrowY, tip2X, tip2Y, color);
+  
+  lastBearing = bearing;
+  lastArrowX = arrowX;
+  lastArrowY = arrowY;
+  lastTip1X = tip1X;
+  lastTip1Y = tip1Y;
+  lastTip2X = tip2X;
+  lastTip2Y = tip2Y;
+  
+  // Marcas cardinales
+  st7735.st7735_write_str(centerX - 3, centerY - radius - 8, "N", Font_7x10, color);
+  st7735.st7735_write_str(centerX - 3, centerY + radius + 2, "S", Font_7x10, color);
+  st7735.st7735_write_str(centerX + radius + 2, centerY - 3, "E", Font_7x10, color);
+  st7735.st7735_write_str(centerX - radius - 8, centerY - 3, "W", Font_7x10, color);
+}
+
+// Función para mapeo flotante
+int mapf(float value, float in_min, float in_max, int out_min, int out_max) {
+  if (fabs(in_max - in_min) < 1e-8) return (out_min + out_max) / 2;
+  return out_min + (int)(((value - in_min) * (out_max - out_min)) / (in_max - in_min));
+}
+
+// Pantalla de gestión de waypoints
+void drawWaypointManagerScreen(bool firstDraw) {
+  static MenuScreen lastScreen = SCREEN_COUNT;
+  loadWaypointsFromStorage();
+  
+  // Inicializar selectedWaypointIndex si es necesario
+  if (waypointCount > 0 && selectedWaypointIndex < 0) {
+    selectedWaypointIndex = 0;
+  } else if (waypointCount == 0) {
+    selectedWaypointIndex = -1;
+  }
+  
+  if (firstDraw || lastScreen != SCREEN_WAYPOINT_MANAGER) {
+    st7735.st7735_fill_screen(ST7735_BLACK);
+    drawHeaderWithWiFi("Gestionar Puntos");
+    lastScreen = SCREEN_WAYPOINT_MANAGER;
+  }
+  
+  // Sistema de scroll para waypoints (mostrar solo 3 por pantalla)
+  int maxScrollOffset = max(0, waypointCount - 3);
+  
+  // Mostrar solo 3 waypoints por pantalla
+  int yPos = 16;
+  for (int i = 0; i < 3 && (i + waypointScrollOffset) < waypointCount; i++) {
+    int actualIndex = i + waypointScrollOffset;
+    String waypointText = String(actualIndex + 1) + ". " + waypoints[actualIndex].name;
+    if (waypointText.length() > 18) {
+      waypointText = waypointText.substring(0, 15) + "...";
+    }
+    
+    uint16_t textColor = (actualIndex == selectedWaypointIndex) ? MORADO : ST7735_WHITE;
+    st7735.st7735_write_str(0, yPos, waypointText.c_str(), Font_7x10, textColor);
+    
+    // Mostrar coordenadas abreviadas
+    String coords = String(waypoints[actualIndex].latitude, 4) + "," + String(waypoints[actualIndex].longitude, 4);
+    st7735.st7735_write_str(0, yPos + 10, coords.c_str(), Font_7x10, ST7735_GRAY);
+    
+    yPos += 20;
+  }
+  
+  // Indicadores de scroll
+  if (waypointCount > 3) {
+    if (waypointScrollOffset < maxScrollOffset) {
+      // Triángulo abajo
+      for (int dy = 0; dy < 8; dy++) {
+        int startX = 140 + dy;
+        int endX = 148 - dy;
+        for (int x = startX; x <= endX; x++) {
+          st7735.st7735_draw_pixel(x, 70 + dy, ST7735_GRAY);
+        }
+      }
+    }
+    if (waypointScrollOffset > 0) {
+      // Triángulo arriba
+      for (int dy = 0; dy < 8; dy++) {
+        int startX = 140 + dy;
+        int endX = 148 - dy;
+        for (int x = startX; x <= endX; x++) {
+          st7735.st7735_draw_pixel(x, 16 - dy, ST7735_GRAY);
+        }
+      }
+    }
+  }
+  
+  if (waypointCount == 0) {
+    st7735.st7735_write_str(0, 40, "No hay puntos guardados", Font_7x10, ST7735_GRAY);
+    st7735.st7735_write_str(0, 52, "Izq+Der: Agregar punto", Font_7x10, NARANJA);
+  }
+}
+
+// Pantalla de navegación hacia waypoint (backtrack)
+void drawBacktrackScreen(bool firstDraw) {
+  static MenuScreen lastScreen = SCREEN_COUNT;
+  
+  if (firstDraw || lastScreen != SCREEN_BACKTRACK) {
+    st7735.st7735_fill_screen(ST7735_BLACK);
+    drawHeaderWithWiFi("Backtrack");
+    lastScreen = SCREEN_BACKTRACK;
+  }
+  
+  // PROTECCIÓN CRÍTICA: Cargar waypoints y verificar índice ANTES de cualquier acceso
+  loadWaypointsFromStorage();
+  if (waypointCount == 0 || selectedWaypointIndex < 0 || selectedWaypointIndex >= waypointCount) {
+    st7735.st7735_write_str(0, 20, "Selecciona un punto", Font_7x10, ST7735_GRAY);
+    st7735.st7735_write_str(0, 32, "desde Gestionar Puntos", Font_7x10, ST7735_GRAY);
+    st7735.st7735_write_str(0, 44, "para comenzar navegacion", Font_7x10, ST7735_WHITE);
+    return; // Salir para no dibujar el resto de la pantalla
+  }
+  
+  if (!localPositionSet) {
+    st7735.st7735_write_str(0, 20, "GPS Local no disponible", Font_7x10, ST7735_RED);
+    st7735.st7735_write_str(0, 32, "Esperando señal GPS...", Font_7x10, ST7735_GRAY);
+    return;
+  }
+  
+  // Actualizar navegación
+  updateWaypointNavigation();
+  
+  // PROTECCIÓN ADICIONAL antes de acceder al array (por si acaso cambió durante updateWaypointNavigation)
+  if (selectedWaypointIndex < 0 || selectedWaypointIndex >= waypointCount) {
+    return;
+  }
+  
+  // Mostrar información del waypoint objetivo
+  String targetName = waypoints[selectedWaypointIndex].name;
+  st7735.st7735_write_str(0, 16, "Hacia: " + targetName, Font_7x10, NARANJA);
+  
+  // Mostrar información de navegación
+  String distanceStr = String("Dist: ") + String(waypointNavigation.distance, 1) + "m";
+  String bearingStr = String("Dir: ") + String(waypointNavigation.bearing, 0) + "°";
+  String directionStr = String("Hacia: ") + waypointNavigation.direction;
+  
+  // Dibujar brújula a la derecha
+  drawCompass(120, 40, 20, waypointNavigation.bearing, MORADO);
+  
+  // Información de navegación a la izquierda
+  st7735.st7735_write_str(0, 28, bearingStr.c_str(), Font_7x10, ST7735_WHITE);
+  st7735.st7735_write_str(0, 40, directionStr.c_str(), Font_7x10, NARANJA);
+  
+  // Distancia centrada abajo
+  int distanceX = (160 - distanceStr.length() * 7) / 2;
+  st7735.st7735_write_str(distanceX, 68, distanceStr.c_str(), Font_7x10, ST7735_WHITE);
+  
+  // Indicador de GPS local
+  st7735.st7735_write_str(100, 0, "GPS", Font_7x10, MORADO);
+}
+
+// Pantalla de minimapa
+void drawBacktrackMapScreen(bool firstDraw) {
+  static MenuScreen lastScreen = SCREEN_COUNT;
+  static float lastMapLat = -999.0f;
+  static float lastMapLon = -999.0f;
+  static int lastMapWaypointCount = -1;
+  static int lastMapSelectedIdx = -2;
+  
+  loadWaypointsFromStorage();
+  
+  if (firstDraw || lastScreen != SCREEN_BACKTRACK_MAP) {
+    st7735.st7735_fill_screen(ST7735_BLACK);
+    st7735.st7735_write_str(10, 0, "Mapa de ruta", Font_7x10, MORADO);
+    lastScreen = SCREEN_BACKTRACK_MAP;
+  }
+  
+  // PROTECCIÓN CRÍTICA: Verificar índice antes de cualquier acceso
+  if (waypointCount == 0) {
+    st7735.st7735_write_str(10, 40, "No hay puntos", Font_7x10, ST7735_GRAY);
+    return;
+  }
+  
+  // Verificar que el índice seleccionado sea válido
+  if (selectedWaypointIndex < 0 || selectedWaypointIndex >= waypointCount) {
+    st7735.st7735_write_str(10, 40, "Indice invalido", Font_7x10, ST7735_RED);
+    return;
+  }
+  
+  // Verificar si algo cambió
+  bool needsRedraw = false;
+  if (fabs(localLatitude - lastMapLat) > 0.00001f || 
+      fabs(localLongitude - lastMapLon) > 0.00001f ||
+      waypointCount != lastMapWaypointCount ||
+      selectedWaypointIndex != lastMapSelectedIdx) {
+    needsRedraw = true;
+    lastMapLat = localLatitude;
+    lastMapLon = localLongitude;
+    lastMapWaypointCount = waypointCount;
+    lastMapSelectedIdx = selectedWaypointIndex;
+  }
+  
+  if (!needsRedraw) {
+    return;
+  }
+  
+  // Limpiar solo el área del mapa
+  fillRectPixels(10, 10, 140, 60, ST7735_BLACK);
+  
+  // Filtrar puntos cercanos
+  const float MAX_DIST_KM = 5.0f;
+  int nearbyIdx[MAX_WAYPOINTS];
+  int nearbyCount = 0;
+  float refLat = localLatitude;
+  float refLon = localLongitude;
+  bool useNearby = localPositionSet;
+  
+  if (useNearby) {
+    for (int i = 0; i < waypointCount; i++) {
+      // PROTECCIÓN: Verificar que el índice i sea válido
+      if (i < 0 || i >= waypointCount) continue;
+      float dLat = (waypoints[i].latitude - refLat) * 3.14159265359 / 180.0;
+      float dLon = (waypoints[i].longitude - refLon) * 3.14159265359 / 180.0;
+      float a = sin(dLat/2)*sin(dLat/2) + cos(refLat * 3.14159265359 / 180.0)*cos(waypoints[i].latitude * 3.14159265359 / 180.0)*sin(dLon/2)*sin(dLon/2);
+      float c = 2 * atan2(sqrt(a), sqrt(1-a));
+      float dist = 6371.0f * c;
+      if (dist <= MAX_DIST_KM) {
+        nearbyIdx[nearbyCount++] = i;
+      }
+    }
+  }
+  
+  if (useNearby && nearbyCount == 0) {
+    st7735.st7735_write_str(10, 40, "No hay puntos cercanos", Font_7x10, ST7735_GRAY);
+    return;
+  }
+  
+  // Calcular bounding box
+  float minLat, maxLat, minLon, maxLon;
+  if (useNearby && nearbyCount > 0) {
+    // PROTECCIÓN: Verificar que nearbyIdx[0] sea válido
+    if (nearbyIdx[0] < 0 || nearbyIdx[0] >= waypointCount) {
+      st7735.st7735_write_str(10, 40, "Error indice", Font_7x10, ST7735_RED);
+      return;
+    }
+    minLat = maxLat = waypoints[nearbyIdx[0]].latitude;
+    minLon = maxLon = waypoints[nearbyIdx[0]].longitude;
+    for (int i = 1; i < nearbyCount; i++) {
+      // PROTECCIÓN: Verificar que nearbyIdx[i] sea válido
+      if (nearbyIdx[i] < 0 || nearbyIdx[i] >= waypointCount) continue;
+      float lat = waypoints[nearbyIdx[i]].latitude;
+      float lon = waypoints[nearbyIdx[i]].longitude;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+    }
+    if (localPositionSet) {
+      if (localLatitude < minLat) minLat = localLatitude;
+      if (localLatitude > maxLat) maxLat = localLatitude;
+      if (localLongitude < minLon) minLon = localLongitude;
+      if (localLongitude > maxLon) maxLon = localLongitude;
+    }
+  } else {
+    // PROTECCIÓN: Verificar que haya al menos un waypoint
+    if (waypointCount > 0) {
+      minLat = maxLat = waypoints[0].latitude;
+      minLon = maxLon = waypoints[0].longitude;
+      for (int i = 1; i < waypointCount; i++) {
+        // PROTECCIÓN: Verificar que i sea válido
+        if (i < 0 || i >= waypointCount) continue;
+        if (waypoints[i].latitude < minLat) minLat = waypoints[i].latitude;
+        if (waypoints[i].latitude > maxLat) maxLat = waypoints[i].latitude;
+        if (waypoints[i].longitude < minLon) minLon = waypoints[i].longitude;
+        if (waypoints[i].longitude > maxLon) maxLon = waypoints[i].longitude;
+      }
+    } else {
+      return;
+    }
+    if (localPositionSet) {
+      if (localLatitude < minLat) minLat = localLatitude;
+      if (localLatitude > maxLat) maxLat = localLatitude;
+      if (localLongitude < minLon) minLon = localLongitude;
+      if (localLongitude > maxLon) maxLon = localLongitude;
+    }
+  }
+  
+  float latMargin = (maxLat - minLat) * 0.1f + 0.0001f;
+  float lonMargin = (maxLon - minLon) * 0.1f + 0.0001f;
+  minLat -= latMargin; maxLat += latMargin;
+  minLon -= lonMargin; maxLon += lonMargin;
+  int mapX0 = 10, mapY0 = 10, mapW = 140, mapH = 60;
+  
+  if (fabs(maxLat - minLat) < 0.00005f) { maxLat += 0.000025f; minLat -= 0.000025f; }
+  if (fabs(maxLon - minLon) < 0.00005f) { maxLon += 0.000025f; minLon -= 0.000025f; }
+  
+  // Dibujar líneas entre puntos
+  if (useNearby && nearbyCount > 1) {
+    for (int i = 1; i < nearbyCount; i++) {
+      // PROTECCIÓN: Verificar índices antes de acceder
+      if (nearbyIdx[i-1] < 0 || nearbyIdx[i-1] >= waypointCount ||
+          nearbyIdx[i] < 0 || nearbyIdx[i] >= waypointCount) continue;
+      int x0 = mapf(waypoints[nearbyIdx[i-1]].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+      int y0 = mapf(waypoints[nearbyIdx[i-1]].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+      int x1 = mapf(waypoints[nearbyIdx[i]].longitude,   minLon, maxLon, mapX0, mapX0+mapW);
+      int y1 = mapf(waypoints[nearbyIdx[i]].latitude,    maxLat, minLat, mapY0, mapY0+mapH);
+      drawLine(x0, y0, x1, y1, ST7735_GRAY);
+    }
+  } else if (!useNearby && waypointCount > 1) {
+    for (int i = 1; i < waypointCount; i++) {
+      // PROTECCIÓN: Verificar índices antes de acceder
+      if (i-1 < 0 || i-1 >= waypointCount || i < 0 || i >= waypointCount) continue;
+      int x0 = mapf(waypoints[i-1].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+      int y0 = mapf(waypoints[i-1].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+      int x1 = mapf(waypoints[i].longitude,   minLon, maxLon, mapX0, mapX0+mapW);
+      int y1 = mapf(waypoints[i].latitude,    maxLat, minLat, mapY0, mapY0+mapH);
+      drawLine(x0, y0, x1, y1, ST7735_GRAY);
+    }
+  }
+  
+  // Dibujar los puntos
+  if (useNearby && nearbyCount > 0) {
+    for (int i = 0; i < nearbyCount; i++) {
+      int idx = nearbyIdx[i];
+      // PROTECCIÓN: Verificar índice antes de acceder
+      if (idx < 0 || idx >= waypointCount) continue;
+      int x = mapf(waypoints[idx].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+      int y = mapf(waypoints[idx].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+      uint16_t color = (idx == selectedWaypointIndex) ? MORADO : NARANJA;
+      drawCircle(x, y, 3, color);
+    }
+  } else {
+    for (int i = 0; i < waypointCount; i++) {
+      // PROTECCIÓN: Verificar índice antes de acceder
+      if (i < 0 || i >= waypointCount) continue;
+      int x = mapf(waypoints[i].longitude, minLon, maxLon, mapX0, mapX0+mapW);
+      int y = mapf(waypoints[i].latitude,  maxLat, minLat, mapY0, mapY0+mapH);
+      uint16_t color = (i == selectedWaypointIndex) ? MORADO : NARANJA;
+      drawCircle(x, y, 3, color);
+    }
+  }
+  
+  // Dibuja la posición actual
+  if (localPositionSet) {
+    int x = mapf(localLongitude, minLon, maxLon, mapX0, mapX0+mapW);
+    int y = mapf(localLatitude,  maxLat, minLat, mapY0, mapY0+mapH);
+    drawCircle(x, y, 5, ST7735_WHITE);
+    st7735.st7735_write_str(x+6, y-4, "Tu", Font_7x10, ST7735_WHITE);
+  }
+}
+
 // Función para dibujar iconos del menú principal
 void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bgcolor) {
   uint16_t fg = selected ? MORADO : ST7735_WHITE;
@@ -969,12 +1450,34 @@ void drawMenuIcon(int x, int y, int itemIndex, bool selected, uint16_t bgcolor) 
         }
       }
       break;
-    case 3:
+        case 3:
       {  // Info: círculo con i
         drawCircle(x + 9, y + 9, 7, fg);
         drawLine(x + 9, y + 6, x + 9, y + 11, fg);
         st7735.st7735_draw_pixel(x + 9, y + 5, fg);
       }
       break;
-  }
+    case 4:
+      {  // Ejercicio: icono de cronómetro
+        drawCircle(x + 9, y + 9, 6, fg);
+        drawLine(x + 9, y + 9, x + 9, y + 5, fg);
+        drawLine(x + 9, y + 9, x + 12, y + 9, fg);
+      }
+      break;
+    case 5:
+      {  // Emergencia: icono de alerta
+        drawCircle(x + 9, y + 9, 6, fg);
+        drawLine(x + 9, y + 3, x + 9, y + 6, fg);
+        st7735.st7735_draw_pixel(x + 9, y + 12, fg);
+      }
+      break;
+    case 6:
+      {  // Backtrack: flecha de retorno
+        drawLine(x + 4, y + 2, x + 4, y + 16, fg);
+        drawLine(x + 4, y + 16, x + 14, y + 16, fg);
+        drawLine(x + 14, y + 16, x + 10, y + 12, fg);
+        drawLine(x + 14, y + 16, x + 10, y + 20, fg);
+      }
+      break;
+    }
 }

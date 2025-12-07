@@ -6,6 +6,9 @@
 int waypointCount = 0;
 Waypoint waypoints[MAX_WAYPOINTS];
 
+// Configuración de distancia para ejercicio
+ExerciseDistance selectedExerciseDistance = DISTANCE_1_5KM; // Por defecto 1.5km (configuración actual)
+
 
 Data::Data() {}
 

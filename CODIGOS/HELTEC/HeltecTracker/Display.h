@@ -25,6 +25,12 @@ void drawInfoScreen(bool firstDraw = true);
 void drawExerciseScreen(bool firstDraw = true);
 void drawEmergencyScreen(bool firstDraw = true);
 void drawDisconnectedScreen(bool firstDraw = true);
+void drawWaypointManagerScreen(bool firstDraw = true);
+void drawBacktrackScreen(bool firstDraw = true);
+void drawBacktrackMapScreen(bool firstDraw = true);
+void drawDistanceConfigScreen(bool firstDraw = true);
+void drawCompass(int centerX, int centerY, int radius, float bearing, uint16_t color);
+int mapf(float value, float in_min, float in_max, int out_min, int out_max);
 
 // API para popup de caida
 void notifyFallDetected();

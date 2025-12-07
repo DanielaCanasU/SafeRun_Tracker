@@ -4,7 +4,7 @@
 
 
 // Temporizadores (ms)
-inline constexpr unsigned long sendInterval_LoRa_receive_ack = 10000;   // 30s
+extern unsigned long sendInterval_LoRa_receive_ack;   // 30s
 inline constexpr unsigned long sendInterval_LoRa_send_data = 1000;   // 1s
 inline constexpr unsigned long sendInterval_GPS = 1000;    // 1s
 inline constexpr unsigned long timerDelay_Acelerometro = 25; // 25ms
