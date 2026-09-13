@@ -105,22 +105,25 @@ bool parseLoRaMessage(String message, SensorData &data) {
   message.replace("*", "");
   int stIndex  = message.indexOf("ST:");
   int accIndex = message.indexOf("ACC:");
+  int gpsIndex = message.indexOf("GPS:");
 
   if (stIndex == -1) return false;
 
-  // Intentar extraer GPS si existe
-  int latIndex = message.indexOf("LAT:");
-  int lonIndex = message.indexOf("LON:");
-  if (latIndex != -1 && lonIndex != -1) {
-    String latStr = message.substring(latIndex + 4, message.indexOf(",", latIndex));
-    data.latitude = latStr.toFloat();
-    String lonStr = message.substring(lonIndex + 4, message.indexOf(";", lonIndex));
-    data.longitude = lonStr.toFloat();
-  } else {
-    data.latitude = 0.0f;
-    data.longitude = 0.0f;
-  }
+  if (gpsIndex != -1) {
+  int commaIndex = message.indexOf(",", gpsIndex);
+  int semicolonIndex = message.indexOf(";", commaIndex);
 
+  if (commaIndex != -1 && semicolonIndex != -1) {
+    String latStr = message.substring(gpsIndex + 4, commaIndex);
+    String lonStr = message.substring(commaIndex + 1, semicolonIndex);
+
+    data.latitude = latStr.toFloat();
+    data.longitude = lonStr.toFloat();
+  }
+} else {
+  data.latitude = 0.0f;
+  data.longitude = 0.0f;
+}
   // Extraer ST hasta antes de ACC o hasta final
   String stStr;
   if (accIndex != -1) stStr = message.substring(stIndex + 3, accIndex - 1);
